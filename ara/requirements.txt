@@ -1,0 +1,5 @@
+ara-sdk
+anthropic
+psycopg2-binary
+python-dotenv
+twilio

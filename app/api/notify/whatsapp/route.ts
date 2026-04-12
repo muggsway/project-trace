@@ -3,78 +3,71 @@ import { NextRequest, NextResponse } from 'next/server'
 /**
  * POST /api/notify/whatsapp
  *
- * Owned by: Insights & Delivery — Person B
- *
- * Formats a DailySummary into the agreed WhatsApp message format and sends
- * it via Twilio's WhatsApp sandbox.
- *
- * Request body:
- *   { summary: DailySummary, phone?: string }
- *   phone defaults to process.env.DEMO_PHONE_NUMBER if not provided
- *
- * WhatsApp message format (per spec §7.5):
- *   🟢 What worked well
- *   • {what_worked}
- *
- *   🟡 What was average
- *   • {what_was_average}
- *
- *   ⚠️ Watch out          ← omit entirely if warnings is empty
- *   • {warning 1}
- *   • {warning 2}
- *
- * TODO (Person B):
- * 1. npm install twilio
- * 2. import twilio from 'twilio'
- *    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
- * 3. Format the message string from the DailySummary
- * 4. client.messages.create({
- *      from: 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM,  // sandbox: whatsapp:+14155238886
- *      to:   'whatsapp:' + phone,
- *      body: formattedMessage,
- *    })
- *
- * Required env vars:
- *   TWILIO_ACCOUNT_SID
- *   TWILIO_AUTH_TOKEN
- *   TWILIO_WHATSAPP_FROM   (sandbox number, e.g. +14155238886)
- *   DEMO_PHONE_NUMBER      (recipient, e.g. +919876543210)
+ * Formats a DailySummary and sends it via Twilio WhatsApp sandbox.
+ * Called from the summary page and by the ara cron agent at 9 PM ET.
+ * Body: { summary: DailySummary }
  */
-export async function POST(req: NextRequest) {
-  const { summary, phone } = await req.json()
 
+const TWILIO_FROM = 'whatsapp:+14155238886'
+
+export async function POST(req: NextRequest) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID
+  const authToken  = process.env.TWILIO_AUTH_TOKEN
+  const to         = process.env.TWILIO_WHATSAPP_TO
+
+  if (!accountSid || !authToken || !to) {
+    return NextResponse.json({ error: 'Twilio credentials not configured' }, { status: 500 })
+  }
+
+  const { summary } = await req.json()
   if (!summary) {
     return NextResponse.json({ error: 'summary is required' }, { status: 400 })
   }
 
-  const recipient = phone ?? process.env.DEMO_PHONE_NUMBER
+  const dateLabel = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  })
 
-  // Build message string
   const lines: string[] = [
-    '🟢 *What worked well*',
-    `• ${summary.what_worked}`,
+    `📊 *Project Trace — ${dateLabel}*`,
     '',
-    '🟡 *What was average*',
-    `• ${summary.what_was_average}`,
+    '✅ *What worked well*',
+    summary.what_worked,
+    '',
+    '📈 *What was average*',
+    summary.what_was_average,
   ]
 
   if (summary.warnings?.length > 0) {
     lines.push('', '⚠️ *Watch out*')
-    for (const w of summary.warnings) {
-      lines.push(`• ${w}`)
-    }
+    for (const w of summary.warnings) lines.push(`• ${w}`)
   }
 
-  const message = lines.join('\n')
+  lines.push('', '_Powered by Project Trace_')
 
-  // STUB — replace with real Twilio call
-  console.log('[WhatsApp STUB] Would send to', recipient)
-  console.log(message)
+  const body = lines.join('\n')
 
-  return NextResponse.json({
-    ok: true,
-    stub: true,
-    recipient,
-    message,
-  })
+  const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
+  const params = new URLSearchParams({ From: TWILIO_FROM, To: `whatsapp:${to}`, Body: body })
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    },
+  )
+
+  if (!res.ok) {
+    const detail = await res.text()
+    console.error('Twilio error:', detail)
+    return NextResponse.json({ error: 'WhatsApp send failed', detail }, { status: 502 })
+  }
+
+  const result = await res.json()
+  return NextResponse.json({ ok: true, sid: result.sid })
 }
