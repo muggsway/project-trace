@@ -114,7 +114,7 @@ function SectionCard({ title, icon, iconBg = 'bg-gray-100', iconColor = 'text-gr
           <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
             <span className={iconColor}>{icon}</span>
           </div>
-          <h2 className="text-sm font-semibold text-gray-800 tracking-tight">{title}</h2>
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
         </div>
         {right}
       </div>
@@ -431,7 +431,7 @@ export default function DashboardPage() {
                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
                   <Utensils size={13} className="text-amber-500" />
                 </div>
-                <h2 className="text-sm font-semibold text-gray-800 tracking-tight">Nutrition</h2>
+                <h2 className="text-lg font-bold text-gray-900">Nutrition</h2>
               </div>
               <Link href="/food" className="w-6 h-6 rounded-lg bg-gray-900 flex items-center justify-center hover:bg-gray-700 active:scale-95 transition-all">
                 <Plus size={13} className="text-white" />
@@ -455,7 +455,7 @@ export default function DashboardPage() {
                 <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
                   <Pill size={12} className="text-purple-500" />
                 </div>
-                <h2 className="text-xs font-semibold text-gray-700 tracking-tight">Supplements</h2>
+                <h2 className="text-lg font-bold text-gray-900">Supplements</h2>
               </div>
               <div className="px-3 pt-2.5 pb-3">
                 {supplementEntries.length === 0 ? (
@@ -481,7 +481,7 @@ export default function DashboardPage() {
                 <div className="w-6 h-6 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
                   <Droplets size={12} className="text-sky-500" />
                 </div>
-                <h2 className="text-xs font-semibold text-gray-700 tracking-tight">Hydration</h2>
+                <h2 className="text-lg font-bold text-gray-900">Hydration</h2>
               </div>
               <div className="px-3 pt-2.5 pb-3">
                 <div className="flex items-baseline gap-1 mb-2">
