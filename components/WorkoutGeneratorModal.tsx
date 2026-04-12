@@ -201,7 +201,8 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex justify-center">
+    <div className="w-full max-w-md flex flex-col bg-white h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-8 pb-4 border-b border-gray-100">
         <div className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center">
@@ -348,6 +349,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
           </button>
         )}
       </div>
+    </div>
     </div>
   )
 }
