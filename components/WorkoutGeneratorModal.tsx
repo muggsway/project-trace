@@ -87,6 +87,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
+      audio.playbackRate = 1.15   // additional speed-up on top of ElevenLabs speed param
       audioRef.current = audio
       audio.play()
       audio.onended = () => URL.revokeObjectURL(url)

@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       voice_settings: {
         stability: 0.5,
         similarity_boost: 0.75,
+        speed: 1.2,            // 1.0 = default, 1.2 = brisk conversational pace
       },
     }),
   })
