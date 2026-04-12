@@ -233,27 +233,6 @@ export default function AnalyzePage() {
             />
           )}
 
-          {/* ── RECENT WORKOUTS ── */}
-          {data.workouts.length > 0 && (
-            <div className="rounded-xl border border-gray-100 bg-white p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Recent workouts</p>
-              <div className="flex flex-col divide-y divide-gray-50">
-                {data.workouts.slice(0, 5).map((w, i) => (
-                  <div key={i} className="flex items-center justify-between py-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{w.workout_type}</p>
-                      <p className="text-xs text-gray-400">{w.date}</p>
-                    </div>
-                    <div className="text-right text-xs text-gray-500">
-                      {w.duration_mins && <span>{w.duration_mins}min</span>}
-                      {w.avg_hr && <span className="ml-2">{w.avg_hr} bpm</span>}
-                      {w.distance_km && <span className="ml-2">{w.distance_km}km</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
 
         </div>
