@@ -73,14 +73,18 @@ const TILE_STYLES = {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SectionCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function SectionCard({ title, icon, iconBg = 'bg-gray-100', iconColor = 'text-gray-500', children }: {
+  title: string; icon: React.ReactNode; iconBg?: string; iconColor?: string; children: React.ReactNode
+}) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
-      <div className="px-4 pt-4 pb-2 flex items-center gap-2">
-        <span className="text-gray-400">{icon}</span>
-        <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{title}</h2>
+    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2.5 border-b border-gray-50">
+        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+          <span className={iconColor}>{icon}</span>
+        </div>
+        <h2 className="text-xs font-semibold text-gray-700 tracking-tight">{title}</h2>
       </div>
-      <div className="px-4 pb-4 flex flex-col gap-2">{children}</div>
+      <div className="px-4 pb-4 pt-3 flex flex-col gap-2">{children}</div>
     </div>
   )
 }
@@ -190,24 +194,29 @@ function WarningsBanner({ warnings }: { warnings: string[] }) {
   )
 }
 
-// Caricature SVG avatar — abstract geometric person
+// App logo mark — ECG pulse line in a dark rounded square
+function LogoMark() {
+  return (
+    <div className="w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+        <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+// Caricature SVG avatar
 function Avatar() {
   return (
-    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 bg-amber-100 shrink-0">
-      <svg viewBox="0 0 40 40" width="40" height="40">
-        {/* Background */}
+    <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-gray-200 bg-amber-100 shrink-0">
+      <svg viewBox="0 0 40 40" width="36" height="36">
         <circle cx="20" cy="20" r="20" fill="#fef3c7" />
-        {/* Hair */}
         <ellipse cx="20" cy="13" rx="9" ry="8" fill="#92400e" />
         <ellipse cx="20" cy="10" rx="9" ry="5" fill="#92400e" />
-        {/* Face */}
         <circle cx="20" cy="17" r="8" fill="#fcd34d" />
-        {/* Eyes */}
         <circle cx="17" cy="16" r="1.5" fill="#1f2937" />
         <circle cx="23" cy="16" r="1.5" fill="#1f2937" />
-        {/* Smile */}
         <path d="M17 20 Q20 23 23 20" stroke="#92400e" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-        {/* Body */}
         <ellipse cx="20" cy="34" rx="10" ry="8" fill="#6d28d9" />
       </svg>
     </div>
@@ -302,18 +311,26 @@ export default function DashboardPage() {
       <div className="flex flex-col min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
 
         {/* Header */}
-        <div className="px-5 pt-8 pb-4 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Avatar />
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Project Trace</p>
-              <h1 className="text-xl font-bold text-gray-900">{formatDate(new Date().toISOString())}</h1>
+        <div className="px-5 pt-8 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            {/* Logo */}
+            <div className="flex items-center gap-2.5">
+              <LogoMark />
+              <div>
+                <p className="text-[11px] font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+                <p className="text-[9px] text-gray-400 tracking-wider uppercase leading-none mt-0.5">Health Journal</p>
+              </div>
+            </div>
+            {/* Avatar + Analyse */}
+            <div className="flex items-center gap-2">
+              <Link href="/analyse" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
+                <BarChart2 size={12} />
+                Analyse
+              </Link>
+              <Avatar />
             </div>
           </div>
-          <Link href="/analyse" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors shrink-0">
-            <BarChart2 size={13} />
-            Analyse
-          </Link>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{formatDate(new Date().toISOString())}</h1>
         </div>
 
         <div className="flex flex-col gap-3 px-5">
@@ -322,7 +339,7 @@ export default function DashboardPage() {
           <WarningsBanner warnings={warnings} />
 
           {/* ── 1. Body Metrics ───────────────────────────────────────────── */}
-          <SectionCard title="Body Metrics" icon={<Activity size={13} />}>
+          <SectionCard title="Body Metrics" icon={<Activity size={13} />} iconBg="bg-blue-50" iconColor="text-blue-500">
             <div className="flex gap-2">
               <MetricTile label="HRV" value={snap.hrv_ms ?? null} unit="ms"
                 icon={<Activity size={11} />} delta={hrv_delta} higherIsBetter={true} />
@@ -338,7 +355,7 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* ── 2. Nutrition ──────────────────────────────────────────────── */}
-          <SectionCard title="Nutrition" icon={<Utensils size={13} />}>
+          <SectionCard title="Nutrition" icon={<Utensils size={13} />} iconBg="bg-amber-50" iconColor="text-amber-500">
             <Link href="/food" className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 flex items-center gap-3 active:scale-[0.99] transition-all">
               <CaloriesCircle calories={totals.calories} />
               <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1.5">
@@ -354,12 +371,14 @@ export default function DashboardPage() {
           {/* ── 3. Supplements + Hydration (side by side) ─────────────────── */}
           <div className="flex gap-3">
             {/* Supplements */}
-            <div className="flex-1 rounded-2xl border border-gray-100 bg-white overflow-hidden">
-              <div className="px-3 pt-3 pb-2 flex items-center gap-2">
-                <span className="text-gray-400"><Pill size={13} /></span>
-                <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Supplements</h2>
+            <div className="flex-1 rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+              <div className="px-3 pt-3 pb-2.5 flex items-center gap-2 border-b border-gray-50">
+                <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+                  <Pill size={12} className="text-purple-500" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-700 tracking-tight">Supplements</h2>
               </div>
-              <div className="px-3 pb-3">
+              <div className="px-3 pt-2.5 pb-3">
                 {supplementEntries.length === 0 ? (
                   <p className="text-xs text-gray-400">None logged</p>
                 ) : (
@@ -378,24 +397,28 @@ export default function DashboardPage() {
             </div>
 
             {/* Hydration */}
-            <div className="flex-1 rounded-2xl border border-gray-100 bg-white px-3 py-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Droplets size={13} className="text-sky-500" />
-                <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hydration</h2>
+            <div className="flex-1 rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+              <div className="px-3 pt-3 pb-2.5 flex items-center gap-2 border-b border-gray-50">
+                <div className="w-6 h-6 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
+                  <Droplets size={12} className="text-sky-500" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-700 tracking-tight">Hydration</h2>
               </div>
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-lg font-bold text-gray-900">{waterLitres > 0 ? waterLitres : '0'}</span>
-                <span className="text-xs text-gray-400">/ 3L</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(waterLitres / 3, 1) * 100}%`, backgroundColor: waterLitres >= 3 ? '#22c55e' : '#38bdf8' }} />
+              <div className="px-3 pt-2.5 pb-3">
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-lg font-bold text-gray-900">{waterLitres > 0 ? waterLitres : '0'}</span>
+                  <span className="text-xs text-gray-400">/ 3L</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div className="h-full rounded-full transition-all"
+                    style={{ width: `${Math.min(waterLitres / 3, 1) * 100}%`, backgroundColor: waterLitres >= 3 ? '#22c55e' : '#38bdf8' }} />
+                </div>
               </div>
             </div>
           </div>
 
           {/* ── 3. Workout ────────────────────────────────────────────────── */}
-          <SectionCard title="Workout" icon={<Dumbbell size={13} />}>
+          <SectionCard title="Workout" icon={<Dumbbell size={13} />} iconBg="bg-red-50" iconColor="text-red-500">
             {recentWorkouts.length > 0
               ? recentWorkouts.map(w => <WorkoutMiniCard key={w.id} workout={w} />)
               : <p className="text-xs text-gray-400 px-1">No recent workouts</p>
@@ -430,7 +453,7 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* ── 4. Mental Health ──────────────────────────────────────────── */}
-          <SectionCard title="Mental Health" icon={<Brain size={13} />}>
+          <SectionCard title="Mental Health" icon={<Brain size={13} />} iconBg="bg-violet-50" iconColor="text-violet-500">
             {latestMood && ms ? (
               <div className={`rounded-xl px-4 py-3 flex items-center gap-3 border ${ms.bg} ${ms.border}`}>
                 <div className={`w-3 h-3 rounded-full shrink-0 ${ms.dot}`} />
