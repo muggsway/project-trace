@@ -29,16 +29,36 @@ interface PlannedWorkout {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const POSITIVE_WORDS = ['good', 'great', 'happy', 'energized', 'focused', 'calm',
-  'motivated', 'excellent', 'positive', 'productive', 'refreshed', 'strong', 'amazing', 'upbeat']
-const NEGATIVE_WORDS = ['sluggish', 'tired', 'stressed', 'anxious', 'sad', 'bad', 'low',
-  'exhausted', 'depressed', 'irritable', 'awful', 'terrible', 'fatigued', 'drained', 'rough']
+const NEGATION = /\b(not|don't|dont|didn't|didnt|never|can't|cant|no longer)\b/i
 
-function getMoodColor(text: string): 'green' | 'yellow' | 'red' {
+const MOOD_MAP: { keywords: string[]; emoji: string; color: 'green' | 'yellow' | 'red' }[] = [
+  { keywords: ['happy', 'great', 'amazing', 'fantastic', 'excellent', 'wonderful', 'awesome', 'good', 'well'], emoji: '😊', color: 'green'  },
+  { keywords: ['energized', 'energetic', 'motivated', 'strong', 'pumped', 'upbeat', 'productive'],   emoji: '⚡', color: 'green'  },
+  { keywords: ['calm', 'relaxed', 'peaceful', 'refreshed', 'rested', 'balanced', 'centered'],        emoji: '😌', color: 'green'  },
+  { keywords: ['focused', 'sharp', 'clear', 'alert', 'present'],                                     emoji: '🎯', color: 'green'  },
+  { keywords: ['okay', 'fine', 'alright', 'decent', 'neutral', 'average', 'normal'],                 emoji: '🙂', color: 'yellow' },
+  { keywords: ['tired', 'exhausted', 'fatigued', 'drained', 'sleepy', 'groggy'],                     emoji: '😴', color: 'red'    },
+  { keywords: ['stressed', 'overwhelmed', 'anxious', 'worried', 'nervous', 'tense'],                 emoji: '😤', color: 'red'    },
+  { keywords: ['sad', 'down', 'depressed', 'low', 'unhappy', 'miserable', 'upset'],                  emoji: '😔', color: 'red'    },
+  { keywords: ['sick', 'unwell', 'ill', 'nauseous', 'rough', 'awful', 'terrible', 'sluggish'],       emoji: '🤒', color: 'red'    },
+  { keywords: ['irritable', 'frustrated', 'angry', 'annoyed'],                                        emoji: '😠', color: 'red'    },
+]
+
+function getMoodMeta(text: string): { emoji: string; color: 'green' | 'yellow' | 'red' } {
   const lower = text.toLowerCase()
-  if (NEGATIVE_WORDS.some(w => lower.includes(w))) return 'red'
-  if (POSITIVE_WORDS.some(w => lower.includes(w))) return 'green'
-  return 'yellow'
+  // Check each mood bucket — if a negation precedes a positive keyword, flip to red
+  for (const bucket of MOOD_MAP) {
+    for (const kw of bucket.keywords) {
+      const idx = lower.indexOf(kw)
+      if (idx === -1) continue
+      const before = lower.slice(Math.max(0, idx - 20), idx)
+      const negated = NEGATION.test(before)
+      if (negated && bucket.color === 'green') return { emoji: '😔', color: 'red' }
+      if (negated && bucket.color === 'yellow') return { emoji: '😔', color: 'red' }
+      return { emoji: bucket.emoji, color: bucket.color }
+    }
+  }
+  return { emoji: '🙂', color: 'yellow' }
 }
 
 // Shorten supplement/food names: take first meaningful word, strip filler words
@@ -325,13 +345,13 @@ export default function DashboardPage() {
   const moodEntries = entries.filter(e => e.entry_type === 'mood')
     .sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())
   const latestMood = moodEntries[0] ?? null
-  const moodColor  = latestMood ? getMoodColor(latestMood.description) : null
+  const moodMeta   = latestMood ? getMoodMeta(latestMood.description) : null
   const moodStyles = {
-    green:  { bg: 'bg-green-50',  border: 'border-green-200',  dot: 'bg-green-500',  text: 'text-green-800'  },
-    yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', dot: 'bg-yellow-400', text: 'text-yellow-800' },
-    red:    { bg: 'bg-red-50',    border: 'border-red-200',    dot: 'bg-red-500',    text: 'text-red-800'    },
+    green:  { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-800'  },
+    yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800' },
+    red:    { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-800'    },
   }
-  const ms = moodColor ? moodStyles[moodColor] : null
+  const ms = moodMeta ? moodStyles[moodMeta.color] : null
   const today = new Date().toISOString().slice(0, 10)
 
   return (
@@ -346,16 +366,11 @@ export default function DashboardPage() {
               <LogoMark />
               <div>
                 <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
-                <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Journal</p>
+                <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
               </div>
             </div>
-            {/* Avatar + Analyse + Workout */}
+            {/* Avatar + Analyse */}
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowWorkoutGenerator(true)}
-                className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
-                title="Plan a workout">
-                <Dumbbell size={17} />
-              </button>
               <Link href="/analyse" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
                 <BarChart2 size={12} />
                 Analyse
@@ -491,11 +506,11 @@ export default function DashboardPage() {
 
           {/* ── 4. Mental Health ──────────────────────────────────────────── */}
           <SectionCard title="Mental Health" icon={<Brain size={13} />} iconBg="bg-violet-50" iconColor="text-violet-500">
-            {latestMood && ms ? (
+            {latestMood && ms && moodMeta ? (
               <div className={`rounded-xl px-4 py-3 flex items-center gap-3 border ${ms.bg} ${ms.border}`}>
-                <div className={`w-3 h-3 rounded-full shrink-0 ${ms.dot}`} />
+                <span className="text-2xl shrink-0">{moodMeta.emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${ms.text}`}>{latestMood.description}</p>
+                  <p className={`text-sm font-semibold truncate ${ms.text}`}>{latestMood.description}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {new Date(latestMood.logged_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </p>

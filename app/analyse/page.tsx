@@ -62,14 +62,26 @@ export default function AnalysePage() {
   return (
     <div className="flex flex-col min-h-screen pb-16">
       {/* Header */}
-      <div className="px-5 pt-8 pb-4 flex items-center gap-3">
-        <Link href="/" className="text-gray-400 hover:text-gray-600">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Project Trace</p>
-          <h1 className="text-xl font-bold text-gray-900">Analyse</h1>
+      <div className="px-5 pt-8 pb-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {/* Logo mark */}
+            <div className="w-11 h-11 bg-gray-900 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+              <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
+            </div>
+          </div>
+          <Link href="/" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
+            <ArrowLeft size={12} />
+            Back
+          </Link>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Analyse</h1>
       </div>
 
       {loading && (

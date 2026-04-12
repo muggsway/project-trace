@@ -45,7 +45,7 @@ You must always respond with JSON only (no markdown). Two possible response shap
   "follow_up_question": null,
   "water_ml": <number in ml, or null>,
   "entries": [
-    { "entry_type": "food",       "description": "Ramen",    "quantity": "1 large bowl", "macros": { "calories": 450, "protein_g": 12, "carbs_g": 68, "fat_g": 10 }, "logged_at": "${now}" },
+    { "entry_type": "food",       "description": "Ramen",    "quantity": "1 large bowl", "macros": { "calories": 450, "protein_g": 12, "carbs_g": 68, "fat_g": 10, "fibre_g": 3 }, "logged_at": "${now}" },
     { "entry_type": "supplement", "description": "Iron",     "quantity": "65mg",         "macros": null,                                                                  "logged_at": "${now}" },
     { "entry_type": "workout",    "description": "Deadlift", "quantity": "3 sets × 75 lbs", "macros": null,                                                              "logged_at": "${now}" },
     { "entry_type": "mood",       "description": "Anxious",  "quantity": null,           "macros": null,                                                                  "logged_at": "${now}" }
@@ -53,7 +53,7 @@ You must always respond with JSON only (no markdown). Two possible response shap
 }
 
 Rules:
-- For food entries always include a "macros" object with calories, protein_g, carbs_g, fat_g — estimate based on description and quantity. For all other entry types set "macros" to null.
+- For food entries always include a "macros" object with calories, protein_g, carbs_g, fat_g, fibre_g — estimate based on description and quantity. For all other entry types set "macros" to null.
 - Ask follow-up ONLY for missing critical details: food needs quantity, workout needs sets+weight or duration+speed.
 - Supplements and mood do not need follow-ups — log them as-is.
 - Ask only ONE question per turn, covering the most important missing detail.
