@@ -7,6 +7,7 @@ export interface Macros {
   protein_g: number
   carbs_g: number
   fat_g: number
+  fibre_g?: number
 }
 
 export interface JournalEntry {
