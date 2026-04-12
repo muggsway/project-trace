@@ -9,17 +9,20 @@ interface LogTimelineProps {
 }
 
 export default function LogTimeline({ initialEntries }: LogTimelineProps) {
-  const [entries, setEntries] = useState(initialEntries)
+  const [overrides, setOverrides] = useState<Record<string, Partial<JournalEntry>>>({})
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
   function confirmEntry(id: string) {
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: 'confirmed' as const } : e))
-    )
+    setOverrides((prev) => ({ ...prev, [id]: { status: 'confirmed' as const } }))
   }
 
   function dismissEntry(id: string) {
-    setEntries((prev) => prev.filter((e) => e.id !== id))
+    setDismissed((prev) => new Set(prev).add(id))
   }
+
+  const entries = initialEntries
+    .filter((e) => !dismissed.has(e.id))
+    .map((e) => ({ ...e, ...overrides[e.id] }))
 
   // Sort newest first
   const sorted = [...entries].sort(
