@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, Zap, AlertTriangle, CheckCircle, GitBranch, ChevronDown } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, Zap, AlertTriangle, CheckCircle, GitBranch, ChevronDown, Send } from 'lucide-react'
 
 interface Snapshot {
   date: string
@@ -61,6 +61,34 @@ export default function AnalyzePage() {
   const [data, setData] = useState<AnalyzeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function sendWhatsApp() {
+    const insights = data?.insights
+    if (!insights) return
+    setSending(true)
+    try {
+      const summary = {
+        what_worked: insights.what_worked ?? '',
+        what_was_average: insights.what_was_average ?? '',
+        warnings: insights.warnings ?? [],
+      }
+      const res = await fetch('/api/notify/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Unknown error' }))
+        alert(`Failed to send: ${error}`)
+        return
+      }
+      setSent(true)
+    } finally {
+      setSending(false)
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -95,13 +123,18 @@ export default function AnalyzePage() {
   return (
     <div className="flex flex-col min-h-screen pb-16">
       {/* Header */}
-      <div className="px-5 pt-8 pb-4 flex items-center gap-3">
-        <Link href="/" className="text-gray-400 hover:text-gray-600">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Project Trace</p>
-          <h1 className="text-xl font-bold text-gray-900">Analyze</h1>
+      <div className="px-5 pt-8 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-gray-400 hover:text-gray-600">
+            <ArrowLeft size={20} />
+          </Link>
+          <div className="flex items-center gap-3">
+            <LogoMark />
+            <div>
+              <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+              <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Analyze</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -242,6 +275,28 @@ export default function AnalyzePage() {
             </div>
           )}
 
+          {/* ── WHATSAPP SEND ── */}
+          {legacy && (
+            <div className="mt-2 pb-2">
+              {sent ? (
+                <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-50 border border-green-200">
+                  <CheckCircle size={16} className="text-green-600" />
+                  <span className="text-sm font-semibold text-green-700">Sent via WhatsApp</span>
+                </div>
+              ) : (
+                <button
+                  onClick={sendWhatsApp}
+                  disabled={sending}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Send size={15} />
+                  {sending ? 'Sending…' : 'Send via WhatsApp'}
+                </button>
+              )}
+              <p className="text-center text-xs text-gray-400 mt-2">Delivered via Twilio · auto-sent at 9 PM</p>
+            </div>
+          )}
+
         </div>
       )}
     </div>
@@ -249,6 +304,16 @@ export default function AnalyzePage() {
 }
 
 // ── Sub-components ──
+
+function LogoMark() {
+  return (
+    <div className="w-11 h-11 bg-gray-900 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
 
 type CardVariant = 'green' | 'blue' | 'amber' | 'indigo'
 
