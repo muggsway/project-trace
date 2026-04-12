@@ -422,7 +422,224 @@ Complete these **before** the 3-hour clock starts:
 
 ---
 
-## 13. Future Roadmap (Post-Hackathon)
+## 13. Feature: Workout Generator
+
+### Overview
+
+A conversational workout generator accessible from the home screen. The user describes what they want (or just says "leg day"), Claude gathers any missing information one question at a time, then generates a structured workout plan. Claude is health-context aware — it sees the user's HRV, sleep, and recent workouts before generating, and will proactively suggest scaling down if the user is under-recovered.
+
+Supports: **Strength Training** and **Running** only.
+
+---
+
+### 13.1 Entry Point
+
+A **`+` action button** on the home screen (alongside or near the floating mic button). Tapping it shows two options:
+
+- **Log entry** → opens the existing voice overlay
+- **Generate workout** → opens the Workout Generator modal
+
+---
+
+### 13.2 Workout Generator Modal (Full-Screen)
+
+Opens as a full-screen modal, similar in feel to the voice overlay. Contains a **chat thread** — alternating user and Claude bubbles — plus an input bar at the bottom.
+
+**Input bar:**
+- Primary: mic button (ElevenLabs STT via `/api/stt`)
+- Always-visible text field underneath as fallback
+- User can switch between voice and text mid-conversation
+
+**Conversation flow:**
+1. User opens modal — Claude greets with a prompt: *"What kind of workout do you want today?"*
+2. User responds (voice or text)
+3. Claude identifies workout type and checks for missing required fields
+4. Claude asks **one missing field per turn** — never dumps all questions at once
+5. Once all required fields are collected, Claude generates the workout
+6. Generated workout is displayed in the chat as a structured card
+
+---
+
+### 13.3 Required Fields by Workout Type
+
+**Strength Training:**
+| Field | Example |
+|---|---|
+| Muscles targeted | Legs, chest, back, full body |
+| Duration | 15 mins, 45 mins |
+| Equipment | Full gym / dumbbells only / bodyweight |
+
+Equipment flow: When the user says "strength training", Claude asks: *"Should I assume you have access to a full gym? If not, what equipment do you have or don't have?"*
+
+**Running:**
+| Field | Example |
+|---|---|
+| Duration | 20 mins, 5km |
+| Intensity / Zone | Easy (Zone 1-2), Moderate (Zone 3), Hard (Zone 4-5) |
+
+Running intensity is expressed as **heart rate zones (1–5)**:
+- Zone 1-2: Easy/recovery
+- Zone 3: Moderate/aerobic
+- Zone 4-5: Hard/threshold/max
+
+---
+
+### 13.4 Health Context Injection
+
+Before generating, Claude receives the user's current health snapshot:
+- Today's HRV (and % deviation from 14-day avg)
+- Last night's sleep hours and score
+- Yesterday's workout (type, intensity, duration)
+- Any symptoms logged in the last 24 hours
+
+Claude uses this to proactively flag recovery concerns and adjust the plan:
+
+> *"Your HRV is 19% below your baseline today and you ran hard yesterday — I'd suggest scaling this leg session down. Want me to keep it moderate, or push through?"*
+
+The user can override at any time. Claude respects the override without pushing back.
+
+---
+
+### 13.5 Generated Workout Format
+
+**Structured with instructions.** Each exercise includes:
+- Sets × reps (or duration for running intervals)
+- Rest time between sets
+- One-line coach tip
+
+**Strength example:**
+```
+💪 Leg Day — 15 mins · Full gym
+
+Warm-up (2 min)
+• Bodyweight squats × 15
+
+Main block
+• Barbell Back Squat    3 × 10  |  rest 60s
+  → Keep chest up, knees tracking over toes
+• Romanian Deadlift     3 × 10  |  rest 60s
+  → Hinge at hips, soft bend in knees
+• Leg Press             2 × 15  |  rest 45s
+  → Full range of motion, don't lock knees at top
+
+Cooldown (1 min)
+• Standing quad stretch × 30s each side
+```
+
+**Running example:**
+```
+🏃 Zone 3 Run — 20 mins
+
+Warm-up    5 min  |  Zone 1-2 easy jog
+Main block 12 min  |  Zone 3 — steady aerobic effort
+             Keep cadence ~170 spm, conversational pace
+Cooldown   3 min  |  Zone 1 walk/jog
+
+Target HR: ~140-155 bpm (adjust for your max HR)
+```
+
+---
+
+### 13.6 Post-Generation Actions
+
+Once the workout card appears in the chat:
+
+| Action | Behaviour |
+|---|---|
+| **Save** | Saves to `planned_workouts` table. Appears in today's timeline as a pending workout entry. |
+| **Regenerate** | Claude generates a new version with the same inputs. Previous card stays visible above. |
+| **Mark as done** | Immediately saves to `planned_workouts` as `completed`. Creates a confirmed journal entry. Modal closes. |
+
+---
+
+### 13.7 Data Model — `planned_workouts` Table
+
+Separate from the `workouts` table (which stores Terra-synced completed workouts).
+
+```sql
+CREATE TABLE planned_workouts (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workout_type    TEXT NOT NULL CHECK (workout_type IN ('strength', 'running')),
+  duration_mins   INT NOT NULL,
+  muscles         TEXT[],           -- e.g. ['legs', 'glutes'] — null for running
+  intensity_zone  INT,              -- 1-5, null for strength
+  equipment       TEXT,             -- 'full gym', 'bodyweight', etc.
+  plan_json       JSONB NOT NULL,   -- full structured workout from Claude
+  plan_text       TEXT NOT NULL,    -- rendered text version (for WhatsApp/display)
+  status          TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'completed', 'skipped')),
+  health_context  JSONB,            -- snapshot of HRV/sleep/workouts at generation time
+  generated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at    TIMESTAMPTZ
+);
+```
+
+---
+
+### 13.8 API Route — `/api/workout/generate`
+
+```
+POST /api/workout/generate
+
+Body:
+{
+  messages: { role: 'user'|'assistant', content: string }[]  // full conversation so far
+  health_context: {
+    hrv_ms: number, hrv_avg_14d: number,
+    sleep_hours: number, sleep_score: number,
+    last_workout: { type, duration_mins, avg_hr, date } | null,
+    recent_symptoms: string[]
+  }
+}
+
+Response:
+{
+  type: 'question'    // Claude needs more info → content is the next question
+       | 'workout'    // workout is ready → content is the plan
+  content: string     // Claude's message text
+  workout?: {         // only when type === 'workout'
+    workout_type: string
+    duration_mins: number
+    muscles?: string[]
+    intensity_zone?: number
+    equipment?: string
+    plan_json: object
+    plan_text: string
+  }
+}
+```
+
+Claude's system prompt instructs it to:
+1. Return `type: 'question'` until all required fields are collected
+2. Return `type: 'workout'` once ready to generate
+3. Always consider health context and flag concerns
+4. Never generate a workout without all required fields
+
+---
+
+### 13.9 Home Screen Placement
+
+```
+┌─────────────────────────────────┐
+│ Project Trace    Sunday Apr 12  │
+│                          [+] 🎤 │  ← + button added next to mic
+├─────────────────────────────────┤
+│ ⚠️ 2 active warnings          > │
+├─────────────────────────────────┤
+│ TRACKER                         │
+│ [HRV 42↓] [Sleep 6.2h↓]        │
+│ [Steps]   [HR 61↑]              │
+│ [🏃 5.4km Run · 34m · 172bpm]  │
+├─────────────────────────────────┤
+│ TODAY'S LOG          ← below workouts
+│ ...entries...                   │
+└─────────────────────────────────┘
+```
+
+The `+` button sits in the top-right header area alongside the existing "Today's Summary →" link, or as a floating button paired with the mic.
+
+---
+
+## 14. Future Roadmap (Post-Hackathon)
 
 - **Photo food detection** — camera tap → Claude Vision identifies food, auto-creates journal entry
 - **Multi-user auth** — Supabase Auth, each user has isolated data
