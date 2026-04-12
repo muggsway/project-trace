@@ -2,20 +2,62 @@
 
 import { useState, useRef } from 'react'
 import { X, Square } from 'lucide-react'
+import { JournalEntry } from '@/lib/types'
 
 interface VoiceOverlayProps {
   onClose: () => void
-  onResult: (transcript: string) => void
+  onResult: (entries: JournalEntry[], waterMl: number | null) => void
 }
 
-type RecordingState = 'idle' | 'recording' | 'processing'
+type Stage = 'idle' | 'recording' | 'thinking' | 'speaking'
+
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+}
 
 export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
-  const [state, setState] = useState<RecordingState>('idle')
-  const [transcript, setTranscript] = useState('')
+  const [stage, setStage] = useState<Stage>('idle')
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
   const [error, setError] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+
+  async function speakText(text: string) {
+    setStage('speaking')
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new Error(`TTS API error ${res.status}`)
+
+      const arrayBuffer = await res.arrayBuffer()
+      const audioContext = new AudioContext()
+
+      // Resume AudioContext — required on mobile after async gap
+      if (audioContext.state === 'suspended') await audioContext.resume()
+
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      const source = audioContext.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(audioContext.destination)
+
+      await new Promise<void>((resolve) => {
+        source.onended = () => resolve()
+        source.start(0)
+      })
+
+      await audioContext.close()
+    } catch (e) {
+      console.error('[TTS]', e)
+      // Non-fatal — question is shown as text
+    } finally {
+      setStage('idle')
+    }
+  }
 
   async function startRecording() {
     setError(null)
@@ -23,23 +65,17 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
       chunksRef.current = []
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
-        setState('processing')
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        await sendToElevenLabs(blob)
+        setStage('thinking')
+        await transcribeAndParse(new Blob(chunksRef.current, { type: 'audio/webm' }))
       }
-
       recorder.start()
       mediaRecorderRef.current = recorder
-      setState('recording')
+      setStage('recording')
     } catch {
-      setError('Microphone access denied. Please allow microphone access and try again.')
+      setError('Microphone access denied.')
     }
   }
 
@@ -47,136 +83,152 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
     mediaRecorderRef.current?.stop()
   }
 
-  async function sendToElevenLabs(blob: Blob) {
+  async function transcribeAndParse(blob: Blob) {
     try {
       const form = new FormData()
       form.append('audio', blob, 'recording.webm')
-
-      const res = await fetch('/api/stt', { method: 'POST', body: form })
-
-      if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: 'Unknown error' }))
+      const sttRes = await fetch('/api/stt', { method: 'POST', body: form })
+      if (!sttRes.ok) {
+        const { error } = await sttRes.json().catch(() => ({ error: 'Unknown' }))
         throw new Error(error)
       }
+      const { transcript } = await sttRes.json()
+      if (!transcript) throw new Error('No speech detected')
 
-      const { transcript } = await res.json()
-      setTranscript(transcript || '(no speech detected)')
-      setState('idle')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Transcription failed'
-      setError(message + ' — please try again.')
-      setState('idle')
+      const updatedMessages: Message[] = [...messages, { role: 'user', content: transcript }]
+      const messagesWithContext: Message[] = followUpQuestion
+        ? [
+            ...messages,
+            { role: 'assistant', content: JSON.stringify({ follow_up_question: followUpQuestion, entries: [], water_ml: null }) },
+            { role: 'user', content: transcript },
+          ]
+        : updatedMessages
+
+      const parseRes = await fetch('/api/log/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messagesWithContext }),
+      })
+      const data = await parseRes.json()
+      if (!parseRes.ok) throw new Error(data.error ?? 'Parse failed')
+
+      if (data.follow_up_question) {
+        setMessages(updatedMessages)
+        setFollowUpQuestion(data.follow_up_question)
+        await speakText(data.follow_up_question)
+      } else {
+        onResult(data.entries ?? [], data.water_ml ?? null)
+        onClose()
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setStage('idle')
     }
   }
 
-  function handleUseTranscript() {
-    onResult(transcript)
-    onClose()
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-sm px-6">
-      {/* Close */}
-      <button
-        onClick={onClose}
-        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-      >
-        <X size={20} />
-      </button>
+    <div className="fixed inset-0 z-50 flex flex-col">
+      {/* Background */}
+      <div className="absolute inset-0 bg-[#0a0a0a]" />
 
-      <div className="w-full max-w-sm flex flex-col items-center gap-8">
-        {/* Status label */}
-        <div className="text-center">
-          <p className="text-white/60 text-sm font-medium tracking-widest uppercase">
-            {state === 'idle' && transcript === '' && 'Tap to speak'}
-            {state === 'recording' && 'Listening…'}
-            {state === 'processing' && 'Transcribing…'}
-            {state === 'idle' && transcript !== '' && 'Transcript'}
-          </p>
+      {/* Content — constrained to mobile container */}
+      <div className="relative flex flex-col flex-1 max-w-md mx-auto w-full px-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
+
+        {/* Top bar */}
+        <div className="flex items-center justify-between mb-auto">
+          <div>
+            <p className="text-white text-base font-semibold tracking-tight">Trace</p>
+            <p className="text-white/40 text-xs mt-0.5">
+              {stage === 'idle' && !followUpQuestion && 'Tap to speak'}
+              {stage === 'idle' && followUpQuestion && 'Tap to answer'}
+              {stage === 'recording' && 'Listening'}
+              {stage === 'thinking' && 'Processing'}
+              {stage === 'speaking' && 'Trace is speaking'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 transition-colors compact"
+          >
+            <X size={17} />
+          </button>
         </div>
 
-        {/* Waveform / Processing animation */}
-        <div className="h-12 flex items-center justify-center gap-1">
-          {state === 'recording' ? (
-            Array.from({ length: 9 }).map((_, i) => (
-              <div
-                key={i}
-                className="waveform-bar w-1 rounded-full bg-amber-400"
-                style={{ animationDelay: `${i * 0.08}s` }}
-              />
-            ))
-          ) : state === 'processing' ? (
-            <div className="flex gap-1.5">
-              {[0, 1, 2].map((i) => (
+        {/* Center — mic + animations */}
+        <div className="flex flex-col items-center justify-center flex-1 gap-8">
+
+          {/* Follow-up question bubble */}
+          {followUpQuestion && stage === 'idle' && (
+            <div className="w-full bg-white/8 border border-white/10 rounded-2xl px-4 py-3.5">
+              <p className="text-amber-400 text-[10px] font-semibold uppercase tracking-widest mb-1.5">Trace</p>
+              <p className="text-white text-sm leading-relaxed">{followUpQuestion}</p>
+            </div>
+          )}
+
+          {/* Mic button with pulse rings */}
+          <div className="relative flex items-center justify-center">
+            {/* Pulse rings — only when recording */}
+            {stage === 'recording' && (
+              <>
+                <div className="absolute w-24 h-24 rounded-full bg-red-500/30 pulse-ring pointer-events-none" />
+                <div className="absolute w-24 h-24 rounded-full bg-red-500/20 pulse-ring-2 pointer-events-none" />
+              </>
+            )}
+
+            {stage === 'thinking' || stage === 'speaking' ? (
+              /* Thinking indicator */
+              <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </div>
+            ) : stage === 'recording' ? (
+              /* Stop button */
+              <button
+                onClick={stopRecording}
+                className="w-24 h-24 rounded-full bg-red-500 active:scale-95 transition-all shadow-2xl flex items-center justify-center"
+              >
+                <Square size={26} fill="white" className="text-white" />
+              </button>
+            ) : (
+              /* Mic button */
+              <button
+                onClick={startRecording}
+                className="w-24 h-24 rounded-full bg-white active:scale-95 transition-all shadow-2xl flex items-center justify-center"
+              >
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="#0a0a0a">
+                  <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
+                  <path d="M19 10a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V19H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 10z" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Waveform — only when recording */}
+          {stage === 'recording' && (
+            <div className="flex items-center justify-center gap-1 h-8">
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
-                  className="w-2 h-2 rounded-full bg-amber-400 animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }}
+                  className="waveform-bar w-0.5 rounded-full bg-white/60"
                 />
               ))}
             </div>
-          ) : (
-            Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="w-1 h-1 rounded-full bg-white/20" />
-            ))
+          )}
+
+          {/* Error */}
+          {error && (
+            <p className="text-red-400 text-xs text-center max-w-xs">{error}</p>
           )}
         </div>
 
-        {/* Transcript display */}
-        {transcript && (
-          <div className="w-full bg-white/10 rounded-2xl px-4 py-3">
-            <p className="text-white text-sm leading-relaxed">{transcript}</p>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <p className="text-red-300 text-sm text-center">{error}</p>
-        )}
-
-        {/* Controls */}
-        <div className="flex flex-col items-center gap-4 w-full">
-          {state === 'idle' && transcript === '' && (
-            <button
-              onClick={startRecording}
-              className="w-20 h-20 rounded-full bg-amber-400 hover:bg-amber-300 active:scale-95 transition-all shadow-lg flex items-center justify-center"
-            >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-                <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
-                <path d="M19 10a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V19H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 10z" />
-              </svg>
-            </button>
-          )}
-
-          {state === 'recording' && (
-            <button
-              onClick={stopRecording}
-              className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-400 active:scale-95 transition-all shadow-lg flex items-center justify-center"
-            >
-              <Square size={28} fill="white" className="text-white" />
-            </button>
-          )}
-
-          {state === 'idle' && transcript !== '' && (
-            <div className="flex gap-3 w-full">
-              <button
-                onClick={() => { setTranscript(''); setError(null) }}
-                className="flex-1 py-3 rounded-2xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
-              >
-                Re-record
-              </button>
-              <button
-                onClick={handleUseTranscript}
-                className="flex-1 py-3 rounded-2xl bg-amber-400 text-gray-900 text-sm font-semibold hover:bg-amber-300 active:scale-95 transition-all"
-              >
-                Log entries
-              </button>
-            </div>
-          )}
-        </div>
-
-        <p className="text-white/30 text-xs text-center pb-[env(safe-area-inset-bottom)]">
-          Powered by ElevenLabs · entries parsed by Claude
+        {/* Bottom hint */}
+        <p className="text-center text-white/20 text-xs">
+          {stage === 'recording' ? 'Tap square to stop' : 'ElevenLabs · Claude'}
         </p>
       </div>
     </div>

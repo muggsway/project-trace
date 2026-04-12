@@ -253,10 +253,12 @@ def main():
     parser = argparse.ArgumentParser(description="Sync Garmin data to Neon DB")
     parser.add_argument("--days", type=int, default=14,
                         help="How many days back to sync workouts (default: 14)")
+    parser.add_argument("--snapshot-days", type=int, default=1,
+                        help="How many days back to sync tracker snapshots (default: 1 = today only)")
     args = parser.parse_args()
 
-    today     = date.today().isoformat()
-    past_date = (date.today() - timedelta(days=args.days)).isoformat()
+    today     = date.today()
+    past_date = (today - timedelta(days=args.days)).isoformat()
 
     print(f"Connecting to Garmin Connect...")
     client = get_client()
@@ -267,11 +269,16 @@ def main():
     print(f"Connected ✓")
 
     try:
-        print(f"\n── Syncing tracker snapshot for today ({today}) ──")
-        sync_tracker_snapshot(conn, client, today)
+        snapshot_days = [
+            (today - timedelta(days=i)).isoformat()
+            for i in range(args.snapshot_days)
+        ]
+        print(f"\n── Syncing tracker snapshots ({', '.join(snapshot_days)}) ──")
+        for day in snapshot_days:
+            sync_tracker_snapshot(conn, client, day)
 
-        print(f"\n── Syncing workouts ({past_date} → {today}) ──")
-        sync_workouts(conn, client, past_date, today)
+        print(f"\n── Syncing workouts ({past_date} → {today.isoformat()}) ──")
+        sync_workouts(conn, client, past_date, today.isoformat())
 
         conn.commit()
         print(f"\nDone ✓  All data committed to DB.")

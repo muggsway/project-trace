@@ -4,26 +4,28 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Camera, Flame, Pencil, X, Utensils } from 'lucide-react'
 import { JournalEntry, Macros } from '@/lib/types'
-import { dummyEntries } from '@/lib/dummy-data'
 import { formatTime } from '@/lib/utils'
+import { useEntries } from '@/lib/entries-context'
 
 export default function FoodPage() {
-  const [entries, setEntries] = useState<JournalEntry[]>(dummyEntries)
-  // Map entry id → local object URL for uploaded photo thumbnails
+  const { entries: allEntries, loading, addEntries } = useEntries()
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [overrides, setOverrides] = useState<Record<string, Partial<JournalEntry>>>({})
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [editing, setEditing] = useState<JournalEntry | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const foodEntries = entries
+  const foodEntries = allEntries
     .filter((e) => e.entry_type === 'food' && e.status === 'confirmed')
+    .map((e) => ({ ...e, ...overrides[e.id] }))
     .sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())
 
   const totalCalories = foodEntries.reduce((sum, e) => sum + (e.macros?.calories ?? 0), 0)
-  const totalProtein = foodEntries.reduce((sum, e) => sum + (e.macros?.protein_g ?? 0), 0)
-  const totalCarbs = foodEntries.reduce((sum, e) => sum + (e.macros?.carbs_g ?? 0), 0)
-  const totalFat = foodEntries.reduce((sum, e) => sum + (e.macros?.fat_g ?? 0), 0)
+  const totalProtein  = foodEntries.reduce((sum, e) => sum + (e.macros?.protein_g ?? 0), 0)
+  const totalCarbs    = foodEntries.reduce((sum, e) => sum + (e.macros?.carbs_g ?? 0), 0)
+  const totalFat      = foodEntries.reduce((sum, e) => sum + (e.macros?.fat_g ?? 0), 0)
+  const totalFibre    = foodEntries.reduce((sum, e) => sum + (e.macros?.fibre_g ?? 0), 0)
 
   async function handlePhoto(file: File) {
     setUploading(true)
@@ -41,7 +43,7 @@ export default function FoodPage() {
         return
       }
       const entry: JournalEntry = { ...data.entry, macros: data.macros }
-      setEntries((prev) => [entry, ...prev])
+      addEntries([entry])
       setThumbnails((prev) => ({ ...prev, [entry.id]: thumbUrl }))
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -53,7 +55,7 @@ export default function FoodPage() {
   }
 
   function handleEntryUpdated(updated: JournalEntry) {
-    setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))
+    setOverrides((prev) => ({ ...prev, [updated.id]: updated }))
     setEditing(null)
   }
 
@@ -79,22 +81,22 @@ export default function FoodPage() {
       <div className="flex flex-col gap-4 px-5">
         {/* Daily totals card */}
         <div className="rounded-2xl border border-gray-100 bg-white px-4 py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Flame size={16} className="text-green-600" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-              Today's Totals
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Flame size={15} className="text-orange-500" />
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Today's Totals</span>
+            </div>
+            <span className="text-2xl font-bold text-gray-900 tabular-nums">
+              {totalCalories > 0 ? `${totalCalories}` : '—'}
+              {totalCalories > 0 && <span className="text-sm font-normal text-gray-400 ml-1">kcal</span>}
             </span>
           </div>
-          <p className="text-3xl font-bold text-gray-900 mb-1">
-            {totalCalories > 0 ? `${totalCalories} kcal` : '—'}
-          </p>
-          {totalCalories > 0 && (
-            <div className="flex gap-4 mt-2">
-              <Macro label="Protein" value={totalProtein} unit="g" color="text-blue-600" />
-              <Macro label="Carbs" value={totalCarbs} unit="g" color="text-amber-600" />
-              <Macro label="Fat" value={totalFat} unit="g" color="text-red-500" />
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-2">
+            <MacroTile label="Protein" value={totalProtein} unit="g" color="bg-blue-50" textColor="text-blue-700" />
+            <MacroTile label="Carbs"   value={totalCarbs}   unit="g" color="bg-amber-50" textColor="text-amber-700" />
+            <MacroTile label="Fat"     value={totalFat}     unit="g" color="bg-orange-50" textColor="text-orange-700" />
+            <MacroTile label="Fibre"   value={totalFibre}   unit="g" color="bg-green-50" textColor="text-green-700" />
+          </div>
         </div>
 
         {/* Food entries */}
@@ -103,9 +105,15 @@ export default function FoodPage() {
             {foodEntries.length} {foodEntries.length === 1 ? 'item' : 'items'} logged
           </h2>
 
-          {foodEntries.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col gap-2">
+              {[1,2].map(i => (
+                <div key={i} className="rounded-2xl border border-gray-100 bg-gray-50 h-16 animate-pulse" />
+              ))}
+            </div>
+          ) : foodEntries.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              No food logged yet. Take a photo to get started.
+              No food logged yet. Use Trace or take a photo.
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -145,19 +153,19 @@ export default function FoodPage() {
                     </div>
                   </div>
 
-                  {/* Calories + edit */}
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    {entry.macros && (
-                      <span className="text-sm font-bold text-gray-700">
-                        {entry.macros.calories} kcal
-                      </span>
-                    )}
+                  {/* Edit + calories */}
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => setEditing(entry)}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                     >
                       <Pencil size={13} />
                     </button>
+                    {entry.macros && (
+                      <span className="text-sm font-bold text-gray-700 tabular-nums">
+                        {entry.macros.calories} kcal
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -343,11 +351,13 @@ function EditSheet({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function Macro({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+function MacroTile({ label, value, unit, color, textColor }: { label: string; value: number; unit: string; color: string; textColor: string }) {
   return (
-    <div>
-      <p className={`text-base font-bold ${color}`}>{value}{unit}</p>
-      <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
+    <div className={`rounded-xl ${color} px-3 py-2.5 flex items-center justify-between`}>
+      <p className="text-xs text-gray-500 font-medium">{label}</p>
+      <p className={`text-sm font-bold ${textColor} tabular-nums`}>
+        {value > 0 ? value.toFixed(0) : '—'}<span className="text-[10px] font-normal ml-0.5">{unit}</span>
+      </p>
     </div>
   )
 }

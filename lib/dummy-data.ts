@@ -58,7 +58,7 @@ export const dummyEntries: JournalEntry[] = [
     created_at: '2026-04-12T08:31:00Z',
     status: 'confirmed',
     source: 'voice',
-    macros: { calories: 340, protein_g: 18, carbs_g: 30, fat_g: 14 },
+    macros: { calories: 340, protein_g: 18, carbs_g: 30, fat_g: 14, fibre_g: 3 },
   },
   {
     id: 'e4',
@@ -79,7 +79,7 @@ export const dummyEntries: JournalEntry[] = [
     created_at: '2026-04-12T13:05:00Z',
     status: 'confirmed',
     source: 'voice',
-    macros: { calories: 520, protein_g: 48, carbs_g: 52, fat_g: 8 },
+    macros: { calories: 520, protein_g: 48, carbs_g: 52, fat_g: 8, fibre_g: 6 },
   },
   {
     id: 'e6',

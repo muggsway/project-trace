@@ -10,10 +10,10 @@ export async function GET() {
     const [snapRow] = await sql`
       WITH avgs AS (
         SELECT
-          ROUND(AVG(hrv_ms)::numeric, 1)      AS hrv_avg_14d,
-          ROUND(AVG(sleep_hours)::numeric, 2)  AS sleep_avg_14d,
-          ROUND(AVG(steps)::numeric, 0)        AS steps_avg_14d,
-          ROUND(AVG(resting_hr)::numeric, 1)   AS resting_hr_avg_30d
+          ROUND(AVG(NULLIF(hrv_ms, 0))::numeric, 1)      AS hrv_avg_14d,
+          ROUND(AVG(NULLIF(sleep_hours, 0))::numeric, 2)  AS sleep_avg_14d,
+          ROUND(AVG(NULLIF(steps, 0))::numeric, 0)        AS steps_avg_14d,
+          ROUND(AVG(NULLIF(resting_hr, 0))::numeric, 1)   AS resting_hr_avg_30d
         FROM tracker_snapshots
         WHERE date >= CURRENT_DATE - INTERVAL '30 days'
           AND date < CURRENT_DATE

@@ -112,9 +112,10 @@ Be concise. Estimate macros based on typical serving sizes visible in the image.
   const description = parsed.description ?? 'Food photo'
   const quantity = parsed.quantity ?? null
 
+  const macrosJson = parsed.macros ? JSON.stringify(parsed.macros) : null
   await sql`
-    INSERT INTO journal_entries (id, entry_type, description, quantity, logged_at, created_at, status, source)
-    VALUES (${id}, 'food', ${description}, ${quantity}, ${now}, ${now}, 'confirmed', 'manual')
+    INSERT INTO journal_entries (id, entry_type, description, quantity, macros, logged_at, created_at, status, source)
+    VALUES (${id}, 'food', ${description}, ${quantity}, ${macrosJson}::jsonb, ${now}, ${now}, 'confirmed', 'manual')
   `
 
   const entry = {
@@ -122,6 +123,7 @@ Be concise. Estimate macros based on typical serving sizes visible in the image.
     entry_type: 'food' as const,
     description,
     quantity,
+    macros: parsed.macros,
     logged_at: now,
     created_at: now,
     status: 'confirmed' as const,
