@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Zap, AlertTriangle, CheckCircle, ChevronDown, Send } from 'lucide-react'
+import { Zap, AlertTriangle, CheckCircle, ChevronDown, Send } from 'lucide-react'
 
 interface Snapshot {
   date: string
@@ -119,9 +119,6 @@ const friction = raw?.friction ?? []
       {/* Header */}
       <div className="px-5 pt-8 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-gray-400 hover:text-gray-600">
-            <ArrowLeft size={20} />
-          </Link>
           <div className="flex items-center gap-3">
             <LogoMark />
             <div>
