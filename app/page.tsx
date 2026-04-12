@@ -474,7 +474,25 @@ export default function DashboardPage() {
       </div>
 
       {showActionMenu && <div className="fixed inset-0 z-30" onClick={() => setShowActionMenu(false)} />}
-      {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} onResult={() => {}} />}
+      {showVoice && (
+        <VoiceOverlay
+          onClose={() => setShowVoice(false)}
+          onResult={async (transcript) => {
+            setShowVoice(false)
+            try {
+              const res = await fetch('/api/log/parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcript }),
+              })
+              if (res.ok) {
+                // Refresh entries from DB so nutrition updates immediately
+                fetch('/api/journal/today').then(r => r.json()).then(d => { if (Array.isArray(d)) setEntries(d) }).catch(() => {})
+              }
+            } catch { /* non-critical */ }
+          }}
+        />
+      )}
       {showWorkoutGenerator && (
         <WorkoutGeneratorModal
           onClose={() => setShowWorkoutGenerator(false)}
