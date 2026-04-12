@@ -144,6 +144,26 @@ function MacroRow({ label, value, unit, color }: { label: string; value: number;
   )
 }
 
+function JournalWorkoutCard({ entry }: { entry: JournalEntry }) {
+  const lower = entry.description.toLowerCase()
+  const icon = lower.includes('run') || lower.includes('jog') ? '🏃'
+    : lower.includes('swim') ? '🏊'
+    : lower.includes('cycl') || lower.includes('bike') ? '🚴'
+    : lower.includes('yoga') ? '🧘'
+    : lower.includes('walk') ? '🚶'
+    : '💪'
+  return (
+    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 flex items-center gap-3">
+      <span className="text-base shrink-0">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-gray-700 capitalize truncate">{entry.description}</p>
+        {entry.quantity && <p className="text-[10px] text-gray-400 mt-0.5">{entry.quantity}</p>}
+      </div>
+      <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full shrink-0">Today</span>
+    </div>
+  )
+}
+
 function WorkoutMiniCard({ workout }: { workout: Workout }) {
   const icon = workout.workout_type?.toLowerCase().includes('run') ? '🏃' : workout.workout_type?.toLowerCase().includes('swim') ? '🏊' : workout.workout_type?.toLowerCase().includes('cycl') ? '🚴' : '💪'
   const wDate = (workout.started_at || '').slice(0, 10)
@@ -278,6 +298,7 @@ export default function DashboardPage() {
   )
 
   const supplementEntries = entries.filter(e => e.entry_type === 'supplement')
+  const workoutJournalEntries = entries.filter(e => e.entry_type === 'workout')
 
   const waterEntries = entries.filter(
     e => e.entry_type === 'drink' && e.description.toLowerCase().includes('water')
@@ -431,9 +452,13 @@ export default function DashboardPage() {
 
           {/* ── 3. Workout ────────────────────────────────────────────────── */}
           <SectionCard title="Workout" icon={<Dumbbell size={13} />} iconBg="bg-red-50" iconColor="text-red-500">
+            {/* Voice-logged workouts from journal */}
+            {workoutJournalEntries.map(e => <JournalWorkoutCard key={e.id} entry={e} />)}
+
+            {/* Garmin-synced workouts */}
             {recentWorkouts.length > 0
               ? recentWorkouts.map(w => <WorkoutMiniCard key={w.id} workout={w} />)
-              : <p className="text-xs text-gray-400 px-1">No recent workouts</p>
+              : workoutJournalEntries.length === 0 && <p className="text-xs text-gray-400 px-1">No recent workouts</p>
             }
 
             {plannedWorkouts.length > 0 ? (
