@@ -29,6 +29,8 @@ import os
 import sys
 import hashlib
 import argparse
+import urllib.request
+import urllib.error
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 
@@ -280,6 +282,22 @@ def main():
 
         conn.commit()
         print(f"\nDone ✓  All data committed to DB.")
+
+        # Regenerate insights now that data is fresh
+        app_url = os.environ.get("NEXT_PUBLIC_APP_URL", "http://localhost:3000")
+        print(f"\n── Regenerating insights ──")
+        try:
+            req = urllib.request.Request(
+                f"{app_url}/api/insights/generate",
+                method="POST",
+                headers={"Content-Type": "application/json"},
+                data=b"{}"
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                print(f"  Insights generated ✓  (status {resp.status})")
+        except urllib.error.URLError as e:
+            print(f"  [warn] Could not reach app to regenerate insights: {e}")
+            print(f"  (start the app with 'npm run dev' and re-run sync, or run scripts/refresh_insights.sh)")
 
     except Exception as e:
         conn.rollback()

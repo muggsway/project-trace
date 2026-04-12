@@ -371,9 +371,9 @@ export default function DashboardPage() {
             </div>
             {/* Avatar + Analyse */}
             <div className="flex items-center gap-2">
-              <Link href="/analyse" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
+              <Link href="/analyze" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
                 <BarChart2 size={12} />
-                Analyse
+                Analyze
               </Link>
               <Avatar />
             </div>
