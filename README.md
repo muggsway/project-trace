@@ -128,22 +128,27 @@ cp .env.local.example .env.local
 | `TWILIO_ACCOUNT_SID` | [console.twilio.com](https://console.twilio.com) → Account Info |
 | `TWILIO_AUTH_TOKEN` | [console.twilio.com](https://console.twilio.com) → Account Info |
 | `TWILIO_WHATSAPP_TO` | Your WhatsApp number with country code (e.g. `+14155550123`) |
+| `ARA_API_KEY` | [app.ara.so](https://app.ara.so) → Settings → System → API Key |
 
-### 3. Sync Garmin data
-
-```bash
-python scripts/garmin_sync.py --days 14
-```
-
-First run may prompt for an MFA code. Tokens are then cached at `~/.garminconnect` and reused automatically. HRV and sleep are computed by Garmin overnight — run the sync in the morning to get last night's values.
-
-### 4. Run
+### 3. Run
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Data sync
+
+Garmin sync runs automatically every time you start the app (`npm run dev` or `npm start`). HRV and sleep are computed by Garmin overnight — start the app in the morning to get last night's values.
+
+To backfill more history manually:
+
+```bash
+python scripts/garmin_sync.py --days 30
+```
 
 ---
 
@@ -162,6 +167,7 @@ app/
     insights/generate/          AI insight generation
     insights/status/            Cached insights reader
     notify/whatsapp/            Twilio WhatsApp sender
+    whatsapp/incoming/          Twilio inbound webhook (bidirectional agent)
     stt/                        ElevenLabs speech-to-text
     tts/                        ElevenLabs text-to-speech
     workout/generate/           Claude workout planner
@@ -174,7 +180,8 @@ lib/
   entries-context.tsx           Global journal entries state
   db.ts                         Neon DB client
 scripts/
-  garmin_sync.py                Garmin → Neon sync (run standalone)
+  garmin_sync.py                Garmin → Neon sync (runs automatically on app start)
+  ara_agent.py                  Optional Ara-based WhatsApp agent (deploy once)
 ara/
-  main.py                       Scheduled WhatsApp digest agent
+  main.py                       Scheduled WhatsApp digest agent (9 PM ET)
 ```

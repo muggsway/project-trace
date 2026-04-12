@@ -1,2 +1,8 @@
-garminconnect
-curl_cffi
+# ── garmin_sync.py ───────────────────────────────────────────────────────────
+garminconnect        # Garmin Connect API client
+curl_cffi            # HTTP client required by garminconnect for SSO auth
+psycopg2-binary      # Postgres driver for Neon DB writes
+python-dotenv        # Loads .env.local for local runs
+
+# ── ara_agent.py ─────────────────────────────────────────────────────────────
+ara-sdk==0.1.41      # Ara SDK — deploy + run the WhatsApp health agent

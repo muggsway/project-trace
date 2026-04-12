@@ -21,6 +21,12 @@ A Next.js (TypeScript) health-tracking app for the Anthropic Hackathon — Biolo
 
 ```
 app/             Next.js app (routes, pages, API handlers)
+  api/
+    notify/whatsapp/    POST — sends daily summary to user's WhatsApp (outbound)
+    whatsapp/incoming/  POST — Twilio webhook, bidirectional agent (inbound + replies)
+    insights/generate/  POST — Claude insight generation
+    log/parse/          POST — voice/text log parser
+    migrate/            GET  — run once to apply DB schema migrations
 components/      React components
 lib/             Shared types, DB client, utilities
 scripts/         Python scripts (Garmin sync — runs separately, not part of Next.js)
@@ -29,6 +35,30 @@ scripts/         Python scripts (Garmin sync — runs separately, not part of Ne
 REQUIREMENTS.md  Full project spec
 GARMIN_SYNC.md   Garmin integration guide
 ```
+
+## WhatsApp bidirectional agent
+
+Bidirectional WhatsApp is handled by the **Ara agent** (`scripts/ara_agent.py`), not by a Next.js route.
+The Ara SDK app deploys to Ara's platform, which manages the WhatsApp channel.
+
+**Deploy the Ara agent:**
+```bash
+pip install -r scripts/requirements.txt
+ara secrets set DATABASE_URL "your-neon-connection-string"
+ara deploy scripts/ara_agent.py
+```
+
+**How it works:**
+- User texts their Ara WhatsApp number → Ara routes to `health_agent` in `ara_agent.py`
+- Agent calls `get_health_context` or `get_todays_summary` to pull live data from Neon DB
+- Agent calls `log_health_entry` if the user mentions food, supplements, symptoms, etc.
+- Ara delivers the reply back to WhatsApp automatically
+
+**Fallback — Twilio inbound:**
+`app/api/whatsapp/incoming/route.ts` is the Twilio-based fallback (full implementation in git history).
+To switch back: restore the implementation from git and configure Twilio's webhook to point to that route.
+
+**Outbound daily summary** is still handled by Twilio via `app/api/notify/whatsapp/route.ts` — unchanged.
 
 ## What to clean up
 
