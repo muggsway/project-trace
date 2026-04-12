@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Mic, BarChart2, Plus, Dumbbell, PenLine } from 'lucide-react'
+import { Dumbbell } from 'lucide-react'
 import HealthTile from '@/components/HealthTile'
 import WorkoutCard from '@/components/WorkoutCard'
 import PlannedWorkoutCard from '@/components/PlannedWorkoutCard'
@@ -11,9 +11,12 @@ import LogTimeline from '@/components/LogTimeline'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import WorkoutGeneratorModal from '@/components/WorkoutGeneratorModal'
 import FoodTrackerTile from '@/components/FoodTrackerTile'
-import { dummyTrackerSnapshot, dummyWorkout, dummyEntries, dummyInsights } from '@/lib/dummy-data'
-import { TrackerSnapshot, Workout } from '@/lib/types'
+import WaterWidget from '@/components/WaterWidget'
+import MoodBox from '@/components/MoodBox'
+import { dummyTrackerSnapshot, dummyWorkout, dummyInsights } from '@/lib/dummy-data'
 import { formatDate } from '@/lib/utils'
+import { JournalEntry, TrackerSnapshot, Workout } from '@/lib/types'
+import { useEntries } from '@/lib/entries-context'
 
 interface PlannedWorkout {
   id: string
@@ -29,12 +32,11 @@ interface PlannedWorkout {
 export default function DashboardPage() {
   const [showVoice, setShowVoice] = useState(false)
   const [showWorkoutGenerator, setShowWorkoutGenerator] = useState(false)
-  const [showActionMenu, setShowActionMenu] = useState(false)
-  const [lastTranscript, setLastTranscript] = useState<string | null>(null)
+  const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([])
   const [snap, setSnap] = useState<TrackerSnapshot>(dummyTrackerSnapshot)
   const [workout, setWorkout] = useState<Workout | null>(dummyWorkout)
-  const [healthLoading, setHealthLoading] = useState(true)
-  const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([])
+  const { entries, addEntries, waterMl, addWaterMl } = useEntries()
+  const [mood, setMood] = useState<string | null>(null)
 
   const fetchPlanned = useCallback(async () => {
     try {
@@ -53,13 +55,15 @@ export default function DashboardPage() {
         if (data.workout !== undefined) setWorkout(data.workout)
       })
       .catch(err => console.error('Failed to load health data:', err))
-      .finally(() => setHealthLoading(false))
   }, [])
 
-  function handleVoiceResult(transcript: string) {
-    setLastTranscript(transcript)
-    // TODO (Voice & Parsing — Person A): POST transcript to /api/log/parse,
-    // then prepend returned entries to the timeline.
+  function handleVoiceResult(newEntries: JournalEntry[], newWaterMl: number | null) {
+    if (newEntries.length) {
+      addEntries(newEntries)
+      const moodEntry = newEntries.find((e) => e.entry_type === 'mood')
+      if (moodEntry) setMood(moodEntry.description)
+    }
+    if (newWaterMl) addWaterMl(newWaterMl)
   }
 
   return (
@@ -75,32 +79,32 @@ export default function DashboardPage() {
               {formatDate(new Date().toISOString())}
             </h1>
           </div>
-          <Link
-            href="/analyse"
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors"
-          >
-            <BarChart2 size={13} />
-            Analyse
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowWorkoutGenerator(true)}
+              className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              title="Generate workout"
+            >
+              <Dumbbell size={18} />
+            </button>
+            <Link
+              href="/summary"
+              className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+            >
+              Today's Summary →
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 px-5">
           {/* Insights banner */}
           <InsightsBanner insights={dummyInsights} />
 
-          {/* Toast: last transcript processed */}
-          {lastTranscript && (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-2">
-              <span className="text-green-600 text-sm">✓</span>
-              <p className="text-sm text-green-800 truncate">{lastTranscript}</p>
-              <button
-                onClick={() => setLastTranscript(null)}
-                className="ml-auto text-green-400 hover:text-green-600 text-xs"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          {/* Mood box — only shown if mood logged */}
+          {mood && <MoodBox mood={mood} />}
+
+          {/* Water widget */}
+          <WaterWidget consumed_ml={waterMl} />
 
           {/* Tracker tiles — 2×2 grid */}
           <section>
@@ -144,63 +148,40 @@ export default function DashboardPage() {
                 higherIsBetter={false}
               />
             </div>
-            {/* Workout — full width */}
             <WorkoutCard workout={workout} />
-
-            {/* Planned workouts (today / tomorrow) */}
             {plannedWorkouts.map(pw => (
               <PlannedWorkoutCard key={pw.id} workout={pw} />
             ))}
           </section>
 
           {/* Food tracker tile */}
-          <FoodTrackerTile entries={dummyEntries} />
+          <FoodTrackerTile entries={entries} />
 
           {/* Log timeline */}
           <section>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">
               Today's Log
             </h2>
-            <LogTimeline initialEntries={dummyEntries} />
+            <LogTimeline initialEntries={entries} />
           </section>
         </div>
       </div>
 
-      {/* Floating action buttons */}
-      <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
-        {/* Action menu options — shown above when open */}
-        {showActionMenu && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-            <button
-              onClick={() => { setShowActionMenu(false); setShowWorkoutGenerator(true) }}
-              className="flex items-center gap-2 bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap"
-            >
-              <Dumbbell size={16} className="text-gray-600" />
-              Generate workout
-            </button>
-            <button
-              onClick={() => { setShowActionMenu(false); setShowVoice(true) }}
-              className="flex items-center gap-2 bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap"
-            >
-              <PenLine size={16} className="text-gray-600" />
-              Log entry
-            </button>
-          </div>
-        )}
-
-        {/* + button */}
-        <button
-          onClick={() => setShowActionMenu(v => !v)}
-          className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 ${showActionMenu ? 'bg-gray-200 rotate-45' : 'bg-gray-900 hover:bg-gray-800'}`}
-        >
-          <Plus size={26} className={showActionMenu ? 'text-gray-700' : 'text-white'} />
-        </button>
+      {/* Trace voice button */}
+      <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-0 right-0 z-40">
+        <div className="max-w-md mx-auto px-5">
+          <button
+            onClick={() => setShowVoice(true)}
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white py-4 shadow-2xl transition-all"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
+              <path d="M19 10a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V19H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 10z" />
+            </svg>
+            <span className="text-sm font-semibold tracking-wide">Trace</span>
+          </button>
+        </div>
       </div>
-
-      {/* Tap outside action menu to close */}
-      {showActionMenu && (
-        <div className="fixed inset-0 z-30" onClick={() => setShowActionMenu(false)} />
-      )}
 
       {/* Voice overlay */}
       {showVoice && (
