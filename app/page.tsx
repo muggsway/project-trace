@@ -10,6 +10,7 @@ import InsightsBanner from '@/components/InsightsBanner'
 import LogTimeline from '@/components/LogTimeline'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import WorkoutGeneratorModal from '@/components/WorkoutGeneratorModal'
+import FoodTrackerTile from '@/components/FoodTrackerTile'
 import { dummyTrackerSnapshot, dummyWorkout, dummyEntries, dummyInsights } from '@/lib/dummy-data'
 import { formatDate } from '@/lib/utils'
 
@@ -137,6 +138,9 @@ export default function DashboardPage() {
               <PlannedWorkoutCard key={pw.id} workout={pw} />
             ))}
           </section>
+
+          {/* Food tracker tile */}
+          <FoodTrackerTile entries={dummyEntries} />
 
           {/* Log timeline */}
           <section>

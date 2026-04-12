@@ -2,6 +2,13 @@ export type EntryType = 'food' | 'drink' | 'supplement' | 'symptom' | 'mood' | '
 export type EntryStatus = 'confirmed' | 'pending'
 export type EntrySource = 'voice' | 'habit' | 'manual'
 
+export interface Macros {
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+}
+
 export interface JournalEntry {
   id: string
   entry_type: EntryType
@@ -11,6 +18,7 @@ export interface JournalEntry {
   created_at: string
   status: EntryStatus
   source: EntrySource
+  macros?: Macros
 }
 
 export interface Habit {
