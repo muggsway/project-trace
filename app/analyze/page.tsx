@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, Zap, AlertTriangle, CheckCircle, GitBranch, ChevronDown, Send } from 'lucide-react'
+import { ArrowLeft, Zap, AlertTriangle, CheckCircle, GitBranch, ChevronDown, Send } from 'lucide-react'
 
 interface Snapshot {
   date: string
@@ -108,9 +108,7 @@ export default function AnalyzePage() {
   const legacy = data?.insights
 
   const hasSleepStages = today && (today.deep_sleep_secs || today.light_sleep_secs || today.rem_sleep_secs)
-  const hasHRV = data && data.snapshots.filter(s => s.hrv_ms).length > 1
-
-  // Use rich shape when available, fall back to legacy columns
+// Use rich shape when available, fall back to legacy columns
   const connections = raw?.connections ?? []
   const friction = raw?.friction ?? []
   const working = raw?.working ?? null
@@ -209,19 +207,6 @@ export default function AnalyzePage() {
             />
           ))}
 
-          {/* ── HRV TREND — contextual ── */}
-          {hasHRV && (
-            <div className="rounded-xl border border-gray-100 bg-white p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">HRV — 14 day trend</p>
-              <HRVSparkline snapshots={data.snapshots} />
-              {today?.avg_stress != null && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-xs text-gray-500">
-                  <span>Avg stress today: <strong className="text-gray-800">{today.avg_stress}</strong>/100</span>
-                  {today.resting_hr && <span>Resting HR: <strong className="text-gray-800">{today.resting_hr} bpm</strong></span>}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ── PATTERNS ── */}
           {(patterns || legacy?.what_was_average) && (
@@ -361,48 +346,6 @@ function SleepStagesBar({ deep, light, rem }: { deep: number; light: number; rem
   )
 }
 
-function HRVSparkline({ snapshots }: { snapshots: Snapshot[] }) {
-  const valid = [...snapshots].reverse().filter(s => s.hrv_ms && s.hrv_ms > 0)
-  if (valid.length < 2) return <p className="text-sm text-gray-400">Not enough HRV data yet</p>
-
-  const vals = valid.map(s => s.hrv_ms as number)
-  const min = Math.min(...vals)
-  const max = Math.max(...vals)
-  const range = max - min || 1
-  const W = 300
-  const H = 56
-  const step = W / (vals.length - 1)
-
-  const points = vals.map((v, i) => `${i * step},${H - ((v - min) / range) * H}`).join(' ')
-  const latest = vals[vals.length - 1]
-  const prev = vals[vals.length - 2]
-  const trend = latest > prev ? 'up' : latest < prev ? 'down' : 'flat'
-
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-gray-900 tabular-nums">{latest}ms</span>
-          <span className="text-xs text-gray-400">today</span>
-        </div>
-        <span className="flex items-center gap-1 text-xs text-gray-400">
-          {trend === 'up' && <TrendingUp size={13} className="text-green-500" />}
-          {trend === 'down' && <TrendingDown size={13} className="text-red-400" />}
-          {trend === 'flat' && <Minus size={13} />}
-          vs yesterday
-        </span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
-        <polyline points={points} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={(vals.length - 1) * step} cy={H - ((latest - min) / range) * H} r="4" fill="#6366f1" />
-      </svg>
-      <div className="flex justify-between text-[10px] text-gray-300 mt-1">
-        <span>{valid[0].date.slice(5)}</span>
-        <span>today</span>
-      </div>
-    </div>
-  )
-}
 
 function fmtMins(secs: number): string {
   const m = Math.round(secs / 60)
