@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Dumbbell, PenLine, BarChart2, ChevronRight, Droplets, Pill,
+  Dumbbell, BarChart2, ChevronRight, Droplets, Pill,
   Timer, MapPin, Heart, Flame, Moon, Activity, Footprints, Brain,
   AlertTriangle, ChevronDown, ChevronUp, Utensils, CalendarCheck,
 } from 'lucide-react'
@@ -229,7 +229,6 @@ function Avatar() {
 export default function DashboardPage() {
   const [showVoice, setShowVoice] = useState(false)
   const [showWorkoutGenerator, setShowWorkoutGenerator] = useState(false)
-  const [showActionMenu, setShowActionMenu] = useState(false)
 
   const { entries, addEntries, waterMl, addWaterMl } = useEntries()
   const [snap, setSnap] = useState<TrackerSnapshot>(dummyTrackerSnapshot)
@@ -328,8 +327,13 @@ export default function DashboardPage() {
                 <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Journal</p>
               </div>
             </div>
-            {/* Avatar + Analyse */}
+            {/* Avatar + Analyse + Workout */}
             <div className="flex items-center gap-2">
+              <button onClick={() => setShowWorkoutGenerator(true)}
+                className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                title="Plan a workout">
+                <Dumbbell size={17} />
+              </button>
               <Link href="/analyse" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
                 <BarChart2 size={12} />
                 Analyse
@@ -483,27 +487,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── FAB ─────────────────────────────────────────────────────────────── */}
-      <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
-        {showActionMenu && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-            <button onClick={() => { setShowActionMenu(false); setShowWorkoutGenerator(true) }}
-              className="flex items-center gap-2 bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap">
-              <Dumbbell size={16} className="text-gray-600" />Plan a new workout
-            </button>
-            <button onClick={() => { setShowActionMenu(false); setShowVoice(true) }}
-              className="flex items-center gap-2 bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap">
-              <PenLine size={16} className="text-gray-600" />Log entry
-            </button>
-          </div>
-        )}
-        <button onClick={() => setShowActionMenu(v => !v)}
-          className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 ${showActionMenu ? 'bg-gray-200 rotate-45' : 'bg-gray-900 hover:bg-gray-800'}`}>
-          <Plus size={26} className={showActionMenu ? 'text-gray-700' : 'text-white'} />
-        </button>
+      {/* ── Voice button ─────────────────────────────────────────────────────── */}
+      <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-0 right-0 z-40">
+        <div className="max-w-md mx-auto px-5">
+          <button onClick={() => setShowVoice(true)}
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white py-4 shadow-2xl transition-all">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
+              <path d="M19 10a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V19H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 10z" />
+            </svg>
+            <span className="text-sm font-semibold tracking-wide">Trace</span>
+          </button>
+        </div>
       </div>
-
-      {showActionMenu && <div className="fixed inset-0 z-30" onClick={() => setShowActionMenu(false)} />}
       {showVoice && (
         <VoiceOverlay
           onClose={() => setShowVoice(false)}
