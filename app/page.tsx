@@ -1,21 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Mic } from 'lucide-react'
+import { Mic, BarChart2 } from 'lucide-react'
 import HealthTile from '@/components/HealthTile'
 import WorkoutCard from '@/components/WorkoutCard'
 import InsightsBanner from '@/components/InsightsBanner'
 import LogTimeline from '@/components/LogTimeline'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import { dummyTrackerSnapshot, dummyWorkout, dummyEntries, dummyInsights } from '@/lib/dummy-data'
+import { TrackerSnapshot, Workout } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 
 export default function DashboardPage() {
   const [showVoice, setShowVoice] = useState(false)
   const [lastTranscript, setLastTranscript] = useState<string | null>(null)
+  const [snap, setSnap] = useState<TrackerSnapshot>(dummyTrackerSnapshot)
+  const [workout, setWorkout] = useState<Workout | null>(dummyWorkout)
+  const [healthLoading, setHealthLoading] = useState(true)
 
-  const snap = dummyTrackerSnapshot
+  useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(data => {
+        if (data.snapshot) setSnap(data.snapshot)
+        if (data.workout !== undefined) setWorkout(data.workout)
+      })
+      .catch(err => console.error('Failed to load health data:', err))
+      .finally(() => setHealthLoading(false))
+  }, [])
 
   function handleVoiceResult(transcript: string) {
     setLastTranscript(transcript)
@@ -37,10 +50,11 @@ export default function DashboardPage() {
             </h1>
           </div>
           <Link
-            href="/summary"
-            className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+            href="/analyse"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors"
           >
-            Today's Summary →
+            <BarChart2 size={13} />
+            Analyse
           </Link>
         </div>
 
@@ -70,42 +84,42 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-2 mb-2">
               <HealthTile
                 label="HRV"
-                value={snap.hrv_ms}
-                unit="ms"
-                rawValue={snap.hrv_ms}
-                average={snap.hrv_avg_14d}
+                value={snap.hrv_ms ? snap.hrv_ms : '—'}
+                unit={snap.hrv_ms ? 'ms' : undefined}
+                rawValue={snap.hrv_ms || undefined}
+                average={snap.hrv_avg_14d || undefined}
                 averageLabel="14d avg"
                 higherIsBetter={true}
               />
               <HealthTile
                 label="Sleep"
-                value={snap.sleep_hours.toFixed(1)}
-                unit="h"
-                rawValue={snap.sleep_hours}
-                average={snap.sleep_avg_14d}
+                value={snap.sleep_hours ? snap.sleep_hours.toFixed(1) : '—'}
+                unit={snap.sleep_hours ? 'h' : undefined}
+                rawValue={snap.sleep_hours || undefined}
+                average={snap.sleep_avg_14d || undefined}
                 averageLabel="14d avg"
                 higherIsBetter={true}
               />
               <HealthTile
                 label="Steps"
-                value={snap.steps.toLocaleString()}
-                rawValue={snap.steps}
-                average={snap.steps_avg_14d}
+                value={snap.steps ? snap.steps.toLocaleString() : '—'}
+                rawValue={snap.steps || undefined}
+                average={snap.steps_avg_14d || undefined}
                 averageLabel="14d avg"
                 higherIsBetter={true}
               />
               <HealthTile
                 label="Resting HR"
-                value={snap.resting_hr}
-                unit="bpm"
-                rawValue={snap.resting_hr}
-                average={snap.resting_hr_avg_30d}
+                value={snap.resting_hr ? snap.resting_hr : '—'}
+                unit={snap.resting_hr ? 'bpm' : undefined}
+                rawValue={snap.resting_hr || undefined}
+                average={snap.resting_hr_avg_30d || undefined}
                 averageLabel="30d avg"
                 higherIsBetter={false}
               />
             </div>
             {/* Workout — full width */}
-            <WorkoutCard workout={dummyWorkout} />
+            <WorkoutCard workout={workout} />
           </section>
 
           {/* Log timeline */}
