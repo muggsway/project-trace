@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Zap, AlertTriangle, CheckCircle, GitBranch, ChevronDown, Send } from 'lucide-react'
+import { ArrowLeft, Zap, AlertTriangle, CheckCircle, ChevronDown, Send } from 'lucide-react'
 
 interface Snapshot {
   date: string
@@ -35,7 +35,6 @@ interface InsightItem {
 }
 
 interface RawInsights {
-  connections: InsightItem[]
   friction: InsightItem[]
   working?: InsightItem | null
   patterns?: InsightItem | null
@@ -109,8 +108,7 @@ export default function AnalyzePage() {
 
   const hasSleepStages = today && (today.deep_sleep_secs || today.light_sleep_secs || today.rem_sleep_secs)
 // Use rich shape when available, fall back to legacy columns
-  const connections = raw?.connections ?? []
-  const friction = raw?.friction ?? []
+const friction = raw?.friction ?? []
   const working = raw?.working ?? null
   const patterns = raw?.patterns ?? null
   // Legacy fallbacks when raw is absent
@@ -128,7 +126,7 @@ export default function AnalyzePage() {
             <LogoMark />
             <div>
               <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
-              <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Analyze</p>
+              <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
             </div>
           </div>
         </div>
@@ -150,75 +148,41 @@ export default function AnalyzePage() {
       {data && (
         <div className="flex flex-col gap-4 px-5">
 
-          {/* ── NO INSIGHTS YET ── only when cache is truly empty ── */}
-          {!legacy && !working && connections.length === 0 && friction.length === 0 && (
+          {/* ── NO INSIGHTS YET ── */}
+          {!legacy && (
             <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-6 text-center">
               <p className="text-sm font-medium text-gray-500">No insights yet</p>
-              <p className="text-xs text-gray-400 mt-1">Run <code className="bg-gray-100 px-1 rounded">python scripts/garmin_sync.py</code> to generate</p>
+              <p className="text-xs text-gray-400 mt-1">Generate insights to see your analysis</p>
             </div>
           )}
 
-          {/* ── WHAT'S WORKING ── */}
-          {(working || legacy?.what_worked) && (
+          {/* ── WHAT WORKED WELL ── */}
+          {(working?.insight || legacy?.what_worked) && (
             <InsightCard
               variant="green"
               icon={<CheckCircle size={13} className="text-green-600" />}
-              label="What's working"
+              label="What worked well"
               item={working ?? { insight: legacy!.what_worked!, evidence: [] }}
-            >
-              {hasSleepStages && today && (
-                <div className="border-t border-green-200 pt-3 mt-3">
-                  <SleepStagesBar
-                    deep={today.deep_sleep_secs ?? 0}
-                    light={today.light_sleep_secs ?? 0}
-                    rem={today.rem_sleep_secs ?? 0}
-                  />
-                  <div className="flex gap-3 mt-2 text-xs text-green-700">
-                    <span>Deep {fmtMins(today.deep_sleep_secs ?? 0)}</span>
-                    <span>·</span>
-                    <span>Light {fmtMins(today.light_sleep_secs ?? 0)}</span>
-                    <span>·</span>
-                    <span>REM {fmtMins(today.rem_sleep_secs ?? 0)}</span>
-                    {today.sleep_score && <><span>·</span><span>Score {today.sleep_score}</span></>}
-                  </div>
-                </div>
-              )}
-            </InsightCard>
+            />
           )}
 
-          {/* ── CONNECTIONS ── */}
-          {connections.map((item, i) => (
-            <InsightCard key={i} variant="blue" icon={<GitBranch size={13} className="text-blue-500" />} label="Connection" item={item} />
-          ))}
-
-          {/* ── FRICTION ── */}
-          {friction.map((item, i) => (
-            <InsightCard key={i} variant="amber" icon={<AlertTriangle size={13} className="text-amber-500" />} label="Friction" item={item} />
-          ))}
-
-          {/* ── LEGACY NOTICES (when no raw shape) ── */}
-          {legacyNotices.map((w, i) => (
-            <InsightCard
-              key={i}
-              variant="amber"
-              icon={<AlertTriangle size={13} className="text-amber-500" />}
-              label="Notice"
-              item={{ insight: w, evidence: [] }}
-            />
-          ))}
-
-
-          {/* ── PATTERNS ── */}
-          {(patterns || legacy?.what_was_average) && (
+          {/* ── WHAT WAS AVERAGE ── */}
+          {(patterns?.insight || legacy?.what_was_average) && (
             <InsightCard
               variant="indigo"
               icon={<Zap size={13} className="text-indigo-500" />}
-              label="14-day pattern"
+              label="What was average"
               item={patterns ?? { insight: legacy!.what_was_average!, evidence: [] }}
             />
           )}
 
-
+          {/* ── WATCH OUT ── */}
+          {friction.length > 0 && friction.map((item, i) => (
+            <InsightCard key={i} variant="amber" icon={<AlertTriangle size={13} className="text-amber-500" />} label="Watch out" item={item} />
+          ))}
+          {friction.length === 0 && legacyNotices.map((w, i) => (
+            <InsightCard key={i} variant="amber" icon={<AlertTriangle size={13} className="text-amber-500" />} label="Watch out" item={{ insight: w, evidence: [] }} />
+          ))}
 
         </div>
       )}
