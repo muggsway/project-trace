@@ -181,29 +181,27 @@ const friction = raw?.friction ?? []
             <InsightCard key={i} variant="amber" icon={<AlertTriangle size={13} className="text-amber-500" />} label="Watch out" item={{ insight: w, evidence: [] }} />
           ))}
 
-        </div>
-      )}
+          {/* ── WHATSAPP BUTTON ── */}
+          {legacy && (
+            <div className="pt-2 pb-6">
+              {sent ? (
+                <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-50 border border-green-200">
+                  <CheckCircle size={16} className="text-green-600" />
+                  <span className="text-sm font-semibold text-green-700">Sent via WhatsApp</span>
+                </div>
+              ) : (
+                <button
+                  onClick={sendWhatsApp}
+                  disabled={sending}
+                  className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white py-4 transition-all disabled:opacity-50"
+                >
+                  <Send size={18} />
+                  <span className="text-sm font-semibold tracking-wide">{sending ? 'Sending…' : 'Send via WhatsApp'}</span>
+                </button>
+              )}
+            </div>
+          )}
 
-      {/* ── WhatsApp sticky button ── */}
-      {legacy && (
-        <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-0 right-0 z-40">
-          <div className="max-w-md mx-auto px-5">
-            {sent ? (
-              <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-50 border border-green-200 shadow-2xl">
-                <CheckCircle size={16} className="text-green-600" />
-                <span className="text-sm font-semibold text-green-700">Sent via WhatsApp</span>
-              </div>
-            ) : (
-              <button
-                onClick={sendWhatsApp}
-                disabled={sending}
-                className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white py-4 shadow-2xl transition-all disabled:opacity-50"
-              >
-                <Send size={18} />
-                <span className="text-sm font-semibold tracking-wide">{sending ? 'Sending…' : 'Send via WhatsApp'}</span>
-              </button>
-            )}
-          </div>
         </div>
       )}
     </div>
