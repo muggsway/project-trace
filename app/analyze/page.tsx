@@ -39,7 +39,6 @@ interface RawInsights {
   friction: InsightItem[]
   working?: InsightItem | null
   patterns?: InsightItem | null
-  data_gaps: string[]
 }
 
 interface CachedInsights {
@@ -116,8 +115,6 @@ export default function AnalyzePage() {
   const friction = raw?.friction ?? []
   const working = raw?.working ?? null
   const patterns = raw?.patterns ?? null
-  const dataGaps = raw?.data_gaps ?? (legacy?.key_correlations ?? [])
-
   // Legacy fallbacks when raw is absent
   const legacyNotices = (!raw && legacy?.warnings?.length) ? legacy.warnings : []
 
@@ -236,43 +233,25 @@ export default function AnalyzePage() {
             />
           )}
 
-          {/* ── WORKOUTS + DATA GAPS ── */}
-          {(data.workouts.length > 0 || dataGaps.length > 0) && (
+          {/* ── RECENT WORKOUTS ── */}
+          {data.workouts.length > 0 && (
             <div className="rounded-xl border border-gray-100 bg-white p-4">
-              {data.workouts.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Recent workouts</p>
-                  <div className="flex flex-col divide-y divide-gray-50 mb-4">
-                    {data.workouts.slice(0, 5).map((w, i) => (
-                      <div key={i} className="flex items-center justify-between py-2">
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">{w.workout_type}</p>
-                          <p className="text-xs text-gray-400">{w.date}</p>
-                        </div>
-                        <div className="text-right text-xs text-gray-500">
-                          {w.duration_mins && <span>{w.duration_mins}min</span>}
-                          {w.avg_hr && <span className="ml-2">{w.avg_hr} bpm</span>}
-                          {w.distance_km && <span className="ml-2">{w.distance_km}km</span>}
-                        </div>
-                      </div>
-                    ))}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Recent workouts</p>
+              <div className="flex flex-col divide-y divide-gray-50">
+                {data.workouts.slice(0, 5).map((w, i) => (
+                  <div key={i} className="flex items-center justify-between py-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{w.workout_type}</p>
+                      <p className="text-xs text-gray-400">{w.date}</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-500">
+                      {w.duration_mins && <span>{w.duration_mins}min</span>}
+                      {w.avg_hr && <span className="ml-2">{w.avg_hr} bpm</span>}
+                      {w.distance_km && <span className="ml-2">{w.distance_km}km</span>}
+                    </div>
                   </div>
-                </>
-              )}
-
-              {dataGaps.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Data gaps</p>
-                  <ul className="flex flex-col gap-1.5">
-                    {dataGaps.map((g, i) => (
-                      <li key={i} className="text-xs text-gray-400 flex gap-2">
-                        <span className="shrink-0">·</span>
-                        <span>{g}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
+                ))}
+              </div>
             </div>
           )}
 

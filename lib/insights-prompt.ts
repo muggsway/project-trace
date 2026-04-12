@@ -87,9 +87,6 @@ Return JSON:
     "insight": "One sentence on a 14-day trend worth noting — omit if nothing meaningful",
     "evidence": ["field: value", "field: value"]
   },
-  "data_gaps": [
-    "One sentence per gap that limits insight quality"
-  ]
 }
 
 ━━━ CONSTRAINTS ━━━
@@ -98,7 +95,6 @@ Return JSON:
 - friction: 0–2 max. Hard limit — do not exceed 2. Only include if genuinely self-sabotaging behavior exists.
 - working: 0–1. Only include if there's a real win worth reinforcing — skip if the day was mediocre.
 - patterns: 0–1. Cross-day observation from the 14-day window. Omit if nothing stands out.
-- data_gaps: 0–2. Flag missing data only if it meaningfully limits analysis. This renders separately in the UI.
 
 ━━━ RULES ━━━
 
