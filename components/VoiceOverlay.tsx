@@ -66,7 +66,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
       // Pick the best supported MIME type for this browser/OS
-      const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg']
+      const preferred = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
       const mimeType = preferred.find(t => MediaRecorder.isTypeSupported(t)) ?? ''
       mimeTypeRef.current = mimeType || 'audio/webm'
 
@@ -78,7 +78,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
         setStage('thinking')
         await transcribeAndParse(new Blob(chunksRef.current, { type: mimeTypeRef.current }))
       }
-      recorder.start()
+      recorder.start(250) // collect chunks every 250ms — prevents corrupted webm headers
       mediaRecorderRef.current = recorder
       setStage('recording')
     } catch {
@@ -92,7 +92,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
 
   async function transcribeAndParse(blob: Blob) {
     try {
-      const ext = mimeTypeRef.current.includes('mp4') ? 'mp4' : mimeTypeRef.current.includes('ogg') ? 'ogg' : 'webm'
+      const ext = mimeTypeRef.current.includes('mp4') ? 'm4a' : mimeTypeRef.current.includes('ogg') ? 'ogg' : 'webm'
       const form = new FormData()
       form.append('audio', blob, `recording.${ext}`)
       const sttRes = await fetch('/api/stt', { method: 'POST', body: form })

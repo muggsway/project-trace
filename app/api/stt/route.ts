@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   // Forward to ElevenLabs Speech-to-Text
   const mime = audio.type || 'audio/webm'
-  const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm'
+  const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm'
   const elevenForm = new FormData()
   elevenForm.append('file', audio, `recording.${ext}`)
   elevenForm.append('model_id', 'scribe_v1')
