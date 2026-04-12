@@ -9,7 +9,7 @@ import { sql } from '@/lib/db'
 export async function GET() {
   try {
     const [row] = await sql`
-      SELECT warnings, generated_at
+      SELECT raw_insights->'friction' AS friction, generated_at
       FROM insights_cache
       ORDER BY generated_at DESC
       LIMIT 1
@@ -19,7 +19,8 @@ export async function GET() {
       return NextResponse.json({ warnings: [], generated_at: null })
     }
 
-    const warnings: string[] = Array.isArray(row.warnings) ? row.warnings : []
+    const friction = Array.isArray(row.friction) ? row.friction : []
+    const warnings: string[] = friction.map((f: { insight: string }) => f.insight).filter(Boolean)
     return NextResponse.json({ warnings, generated_at: row.generated_at })
   } catch (err) {
     console.error('[/api/warnings] DB error:', err)

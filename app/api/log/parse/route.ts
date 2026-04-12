@@ -57,7 +57,7 @@ Rules:
 - Ask follow-up ONLY for missing critical details: food needs quantity, workout needs sets+weight or duration+speed.
 - Supplements and mood do not need follow-ups — log them as-is.
 - Ask only ONE question per turn, covering the most important missing detail.
-- water_ml: 1 glass=250ml, 1L=1000ml. Do not create an entry for water — only set water_ml.
+- water_ml: 1 glass=250ml, 1L=1000ml. Set water_ml AND create a drink entry (entry_type: "drink") with description like "Water" and quantity like "500 ml".
 - Weights in lbs should stay in lbs.
 - If multiple items are mentioned and only one is missing detail, still ask about it.`
 

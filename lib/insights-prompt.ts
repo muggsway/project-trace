@@ -34,7 +34,7 @@ WORKOUT HISTORY — one row per session, newest first:
   distance         Distance in km (cardio only) [OPTIONAL]
 
 JOURNAL — today's logged items:
-  time             HH:MM (24h)
+  time             h:MM AM/PM
   type             food | drink | supplement | symptom | mood | energy | workout
   description      What was logged
   quantity         Amount or dose [OPTIONAL]
@@ -52,9 +52,7 @@ ${journalText || 'No journal entries today'}
 
 ━━━ YOUR TASK ━━━
 
-Generate insights that reveal **hidden connections** — things the user wouldn't notice by looking at any single metric. Prioritize "aha" moments: timing interactions, cross-day patterns, behaviors undermining each other, or cumulative effects.
-
-Do NOT restate numbers the user can already see. Every insight must connect at least two data points in a non-obvious way.
+Generate concise insights that reveal hidden connections across data points. Each insight is 2 sentences max — the first names the finding, the second explains the implication or cause. Do not pad beyond 2 sentences.
 
 ━━━ OUTPUT FORMAT ━━━
 
@@ -78,14 +76,14 @@ Return JSON:
     }
   ],
   "working": {
-    "title": "3-4 word finding headline",
-    "insight": "One sentence on what went well, connecting cause to effect",
-    "evidence": ["field: value", "field: value"]
+    "title": "3-4 word headline",
+    "insight": "1-2 sentences. Finding, then cause/implication.",
+    "evidence": ["field: value"]
   },
   "patterns": {
-    "title": "3-4 word finding headline",
-    "insight": "One sentence on a 14-day trend worth noting — omit if nothing meaningful",
-    "evidence": ["field: value", "field: value"]
+    "title": "3-4 word headline",
+    "insight": "1-2 sentences. Finding, then cause/implication.",
+    "evidence": ["field: value"]
   },
 }
 
@@ -98,19 +96,17 @@ Return JSON:
 
 ━━━ RULES ━━━
 
-1. **Derive, don't describe.** "HRV was 47ms" is description. "HRV recovered despite a double workout — your 7.5h sleep with 88min deep is absorbing the load" is derivation.
+1. **2-sentence max.** Each insight is exactly 1–2 sentences. Sentence 1: the finding. Sentence 2: the cause or implication. Never 3 sentences.
+   - Bad: three sentences with elaboration and hedging.
+   - Good: "HRV crashed after back-to-back strength sessions. Your deep sleep dropped below 60min both nights — insufficient for muscle repair."
 
-2. **Connect across domains.** Link sleep↔workout, nutrition↔energy, timing↔absorption, load↔recovery. Single-metric observations are not insights.
+2. **Connect two data points.** Link sleep↔workout, nutrition↔HRV, timing↔absorption. No single-metric observations.
 
-3. **Be specific.** Cite exact values, times, and dates. "Iron at 04:15, coffee at 04:00" not "iron taken near coffee."
+3. **Omit rather than pad.** Empty friction array is fine. Skip working/patterns if nothing stands out.
 
-4. **Brevity is mandatory.** Each insight is ONE sentence. Title is 3–4 words. Recommendation is ONE sentence. No exceptions.
+4. **Tone:** Direct, clinical. No filler words ("notably", "combination of", "it's worth mentioning").
 
-5. **Omit rather than pad.** If there's no genuine friction, return an empty array. If working was unremarkable, omit the field. Never invent insights to fill slots.
+5. **Recommendations:** Only when actionable. 1 sentence, 15 words max. Omit the field otherwise.
 
-6. **Tone:** Direct and knowledgeable — between coach and clinical. Not casual, not alarmist.
-
-7. **Recommendations are optional.** Only include when the insight has a clear, actionable response. "Your HRV is trending down" doesn't need a recommendation. "Iron absorption blocked by coffee timing" does.
-
-8. **Evidence format:** Each item in evidence array should be "field: value" or "date field: value" for cross-day references.`
+6. **Evidence:** 1–2 items max. "field: value" format.`
 }

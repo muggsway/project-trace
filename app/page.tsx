@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Dumbbell, BarChart2, ChevronRight, Droplets, Pill,
+  Dumbbell, BarChart2, Droplets, Pill,
   Timer, MapPin, Heart, Flame, Moon, Activity, Footprints, Brain,
-  AlertTriangle, ChevronDown, ChevronUp, Utensils, CalendarCheck,
+  AlertTriangle, ChevronDown, ChevronUp, Utensils, CalendarCheck, ClipboardList,
+  Wheat, Droplet, Leaf, Plus,
 } from 'lucide-react'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import WorkoutGeneratorModal from '@/components/WorkoutGeneratorModal'
@@ -46,27 +47,35 @@ const MOOD_MAP: { keywords: string[]; emoji: string; color: 'green' | 'yellow' |
 
 function getMoodMeta(text: string): { emoji: string; color: 'green' | 'yellow' | 'red' } {
   const lower = text.toLowerCase()
-  // Check each mood bucket — if a negation precedes a positive keyword, flip to red
+  // Find the keyword that appears earliest in the sentence — that's the primary mood signal
+  let best: { emoji: string; color: 'green' | 'yellow' | 'red'; idx: number } | null = null
   for (const bucket of MOOD_MAP) {
     for (const kw of bucket.keywords) {
       const idx = lower.indexOf(kw)
       if (idx === -1) continue
+      if (best !== null && idx >= best.idx) continue
       const before = lower.slice(Math.max(0, idx - 20), idx)
       const negated = NEGATION.test(before)
-      if (negated && bucket.color === 'green') return { emoji: '😔', color: 'red' }
-      if (negated && bucket.color === 'yellow') return { emoji: '😔', color: 'red' }
-      return { emoji: bucket.emoji, color: bucket.color }
+      if (negated) {
+        best = { emoji: '😔', color: 'red', idx }
+      } else {
+        best = { emoji: bucket.emoji, color: bucket.color, idx }
+      }
     }
   }
-  return { emoji: '🙂', color: 'yellow' }
+  return best ?? { emoji: '🙂', color: 'yellow' }
 }
 
-// Shorten supplement/food names: take first meaningful word, strip filler words
+// Shorten supplement names: strip parentheticals, form suffixes, and filler words
 function shortenName(name: string): string {
-  const fillers = ['supplement', 'capsule', 'tablet', 'powder', 'extract', 'complex', 'formula']
-  const words = name.split(/\s+/)
-  const meaningful = words.filter(w => !fillers.includes(w.toLowerCase()))
-  return meaningful.slice(0, 2).join(' ')
+  const fillers = new Set(['supplement', 'capsule', 'tablet', 'powder', 'extract', 'complex', 'formula',
+    'glycinate', 'sulfate', 'gluconate', 'citrate', 'bisglycinate', 'monohydrate', 'oxide', 'chloride',
+    'malate', 'fumarate', 'picolinate', 'orotate', 'threonate'])
+  // Strip anything in parentheses
+  const stripped = name.replace(/\s*\(.*?\)/g, '').trim()
+  const words = stripped.split(/\s+/)
+  const meaningful = words.filter(w => !fillers.has(w.toLowerCase()))
+  return meaningful.slice(0, 2).join(' ') || name
 }
 
 // Safe % delta — guards against 0/null/string-zero avg (no infinity)
@@ -95,16 +104,19 @@ const TILE_STYLES = {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SectionCard({ title, icon, iconBg = 'bg-gray-100', iconColor = 'text-gray-500', children }: {
-  title: string; icon: React.ReactNode; iconBg?: string; iconColor?: string; children: React.ReactNode
+function SectionCard({ title, icon, iconBg = 'bg-gray-100', iconColor = 'text-gray-500', right, children }: {
+  title: string; icon: React.ReactNode; iconBg?: string; iconColor?: string; right?: React.ReactNode; children: React.ReactNode
 }) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
-      <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2.5 border-b border-gray-50">
-        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
-          <span className={iconColor}>{icon}</span>
+      <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between border-b border-gray-50">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+            <span className={iconColor}>{icon}</span>
+          </div>
+          <h2 className="text-sm font-semibold text-gray-800 tracking-tight">{title}</h2>
         </div>
-        <h2 className="text-xs font-semibold text-gray-700 tracking-tight">{title}</h2>
+        {right}
       </div>
       <div className="px-4 pb-4 pt-3 flex flex-col gap-2">{children}</div>
     </div>
@@ -140,7 +152,7 @@ function CaloriesCircle({ calories, goal = 2000 }: { calories: number; goal?: nu
   const pct = Math.min(calories / goal, 1)
   const r = 22, circ = 2 * Math.PI * r
   return (
-    <div className="relative w-16 h-16 shrink-0">
+    <div className="relative w-16 h-16 shrink-0 hidden">
       <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
         <circle cx="32" cy="32" r={r} fill="none" stroke="#f3f4f6" strokeWidth="6" />
         <circle cx="32" cy="32" r={r} fill="none"
@@ -160,6 +172,19 @@ function MacroRow({ label, value, unit, color }: { label: string; value: number;
     <div className="flex items-center gap-1.5">
       <span className={`text-xs font-bold ${color}`}>{value > 0 ? value.toFixed(0) : '—'}</span>
       <span className="text-[10px] text-gray-400">{unit} {label}</span>
+    </div>
+  )
+}
+
+function MacroStat({ label, value, icon, iconBg }: { label: string; value: number; icon: React.ReactNode; iconBg: string }) {
+  const display = value > 0 ? (value % 1 === 0 ? value : parseFloat(value.toFixed(1))) : '—'
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${iconBg}`}>
+        {icon}
+      </div>
+      <span className="text-sm font-bold text-gray-900 tabular-nums">{display}{value > 0 ? ' g' : ''}</span>
+      <span className="text-[10px] text-gray-500">{label}</span>
     </div>
   )
 }
@@ -291,9 +316,8 @@ export default function DashboardPage() {
     fetchPlanned()
   }, [fetchPlanned])
 
-  function handleVoiceResult(newEntries: JournalEntry[], newWaterMl: number | null) {
+  function handleVoiceResult(newEntries: JournalEntry[], _newWaterMl: number | null) {
     if (newEntries.length) addEntries(newEntries)
-    if (newWaterMl) addWaterMl(newWaterMl)
   }
 
   // ── Derived: Body Metrics ──────────────────────────────────────────────────
@@ -324,9 +348,7 @@ export default function DashboardPage() {
     e => e.entry_type === 'drink' && e.description.toLowerCase().includes('water')
   )
   const waterLitres = (() => {
-    // Start with waterMl from context (accumulated via voice logging)
-    let total = waterMl / 1000
-    // Also parse water drink entries for any logged directly
+    let total = 0
     for (const e of waterEntries) {
       const q = (e.quantity ?? '').toLowerCase()
       const ml  = q.match(/(\d+\.?\d*)\s*ml/)
@@ -403,18 +425,27 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* ── 2. Nutrition ──────────────────────────────────────────────── */}
-          <SectionCard title="Nutrition" icon={<Utensils size={13} />} iconBg="bg-amber-50" iconColor="text-amber-500">
-            <Link href="/food" className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 flex items-center gap-3 active:scale-[0.99] transition-all">
-              <CaloriesCircle calories={totals.calories} />
-              <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                <MacroRow label="Protein" value={totals.protein_g} unit="g" color="text-blue-600" />
-                <MacroRow label="Carbs"   value={totals.carbs_g}   unit="g" color="text-amber-600" />
-                <MacroRow label="Fat"     value={totals.fat_g}     unit="g" color="text-orange-500" />
-                <MacroRow label="Fibre"   value={totals.fibre_g ?? 0} unit="g" color="text-green-600" />
+          <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
+            <div className="px-4 pt-3.5 pb-2.5 border-b border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <Utensils size={13} className="text-amber-500" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-800 tracking-tight">Nutrition</h2>
               </div>
-              <ChevronRight size={14} className="text-gray-300 shrink-0" />
-            </Link>
-          </SectionCard>
+              <Link href="/food" className="w-6 h-6 rounded-lg bg-gray-900 flex items-center justify-center hover:bg-gray-700 active:scale-95 transition-all">
+                <Plus size={13} className="text-white" />
+              </Link>
+            </div>
+            <div className="px-4 pb-4 pt-3">
+              <Link href="/food" className="grid grid-cols-4 active:opacity-70 transition-opacity">
+                <MacroStat label="Proteins" value={totals.protein_g}    iconBg="bg-blue-50"   icon={<Dumbbell size={16} className="text-blue-500"   />} />
+                <MacroStat label="Carbs"    value={totals.carbs_g}      iconBg="bg-amber-50"  icon={<Wheat    size={16} className="text-amber-500"  />} />
+                <MacroStat label="Fats"     value={totals.fat_g}        iconBg="bg-orange-50" icon={<Droplet  size={16} className="text-orange-500" />} />
+                <MacroStat label="Fiber"    value={totals.fibre_g ?? 0} iconBg="bg-green-50"  icon={<Leaf     size={16} className="text-green-500"  />} />
+              </Link>
+            </div>
+          </div>
 
           {/* ── 3. Supplements + Hydration (side by side) ─────────────────── */}
           <div className="flex gap-3">
@@ -466,7 +497,13 @@ export default function DashboardPage() {
           </div>
 
           {/* ── 3. Workout ────────────────────────────────────────────────── */}
-          <SectionCard title="Workout" icon={<Dumbbell size={13} />} iconBg="bg-red-50" iconColor="text-red-500">
+          <SectionCard title="Workout" icon={<Dumbbell size={13} />} iconBg="bg-red-50" iconColor="text-red-500"
+            right={
+              <button onClick={() => setShowWorkoutGenerator(true)} className="w-6 h-6 rounded-lg bg-gray-900 flex items-center justify-center hover:bg-gray-700 active:scale-95 transition-all">
+                <Plus size={13} className="text-white" />
+              </button>
+            }
+          >
             {/* Voice-logged workouts from journal */}
             {workoutJournalEntries.map(e => <JournalWorkoutCard key={e.id} entry={e} />)}
 
@@ -476,32 +513,23 @@ export default function DashboardPage() {
               : workoutJournalEntries.length === 0 && <p className="text-xs text-gray-400 px-1">No recent workouts</p>
             }
 
-            {plannedWorkouts.length > 0 ? (
-              plannedWorkouts.map(pw => (
-                <div key={pw.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5">
-                      <CalendarCheck size={13} className="text-amber-600" />
-                      <span className="text-xs font-semibold text-gray-800 capitalize">{pw.workout_type}</span>
-                    </div>
-                    <span className="text-[10px] text-amber-600 font-medium bg-amber-100 px-1.5 py-0.5 rounded-full">
-                      {pw.scheduled_date === today ? 'Today' : 'Tomorrow'}
-                    </span>
+            {plannedWorkouts.map(pw => (
+              <div key={pw.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarCheck size={13} className="text-amber-600" />
+                    <span className="text-xs font-semibold text-gray-800 capitalize">{pw.workout_type}</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 pl-5">
-                    {pw.duration_mins}min · {pw.muscles?.join(', ') ?? `Zone ${pw.intensity_zone}`}
-                  </p>
+                  <span className="text-[10px] text-amber-600 font-medium bg-amber-100 px-1.5 py-0.5 rounded-full">
+                    {pw.scheduled_date === today ? 'Today' : 'Tomorrow'}
+                  </span>
                 </div>
-              ))
-            ) : (
-              <button
-                onClick={() => setShowWorkoutGenerator(true)}
-                className="rounded-xl border border-dashed border-gray-200 px-3 py-3 flex items-center gap-2 text-xs text-gray-500 hover:bg-gray-50 transition-colors w-full"
-              >
-                <Dumbbell size={13} className="text-gray-300" />
-                Plan a new workout
-              </button>
-            )}
+                <p className="text-[10px] text-gray-500 pl-5">
+                  {pw.duration_mins}min · {pw.muscles?.join(', ') ?? `Zone ${pw.intensity_zone}`}
+                </p>
+              </div>
+            ))}
+
           </SectionCard>
 
           {/* ── 4. Mental Health ──────────────────────────────────────────── */}
@@ -526,12 +554,9 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* ── 5. Today's Log ────────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-1">
-              Today&apos;s Log
-            </h2>
+          <SectionCard title="Today's Log" icon={<ClipboardList size={13} />} iconBg="bg-gray-100" iconColor="text-gray-500">
             <LogTimeline initialEntries={entries} />
-          </section>
+          </SectionCard>
 
         </div>
       </div>

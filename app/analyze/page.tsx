@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Zap, AlertTriangle, CheckCircle, ChevronDown, Send } from 'lucide-react'
+import { Zap, AlertTriangle, CheckCircle, ChevronDown, Send, RefreshCw } from 'lucide-react'
 
 interface Snapshot {
   date: string
@@ -61,6 +61,22 @@ export default function AnalyzePage() {
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
+
+  async function regenerateInsights() {
+    setRegenerating(true)
+    try {
+      const res = await fetch('/api/insights/generate', { method: 'POST' })
+      if (!res.ok) return
+      const statusRes = await fetch('/api/insights/status')
+      const statusData = await statusRes.json()
+      setData(prev => prev ? { ...prev, insights: statusData.cached ?? null } : prev)
+    } catch {
+      // silent fail — user can retry
+    } finally {
+      setRegenerating(false)
+    }
+  }
 
   async function sendWhatsApp() {
     const insights = data?.insights
@@ -119,14 +135,20 @@ const friction = raw?.friction ?? []
       {/* Header */}
       <div className="px-5 pt-8 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-3">
-            <LogoMark />
-            <div>
-              <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
-              <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
-            </div>
+          <LogoMark />
+          <div>
+            <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+            <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
           </div>
         </div>
+        <button
+          onClick={regenerateInsights}
+          disabled={regenerating}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all disabled:opacity-50"
+        >
+          <RefreshCw size={12} className={`text-gray-600 ${regenerating ? 'animate-spin' : ''}`} />
+          <span className="text-xs font-medium text-gray-600">{regenerating ? 'Generating…' : 'Regenerate'}</span>
+        </button>
       </div>
 
       {loading && (
@@ -264,8 +286,7 @@ function InsightCard({
         {item.title && (
           <p className={`text-base font-semibold ${s.text} mt-1`}>{item.title}</p>
         )}
-        {/* Insight — clamped when collapsed, full when expanded */}
-        <p className={`text-sm ${s.text} leading-relaxed mt-1 ${!expanded ? 'line-clamp-2' : ''}`}>
+        <p className={`text-sm ${s.text} leading-relaxed mt-1`}>
           {item.insight}
         </p>
       </button>

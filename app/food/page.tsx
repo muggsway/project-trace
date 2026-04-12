@@ -1,8 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, Camera, Flame, Pencil, X, Utensils } from 'lucide-react'
+import React, { useRef, useState } from 'react'
+import { Camera, Pencil, X, Dumbbell, Wheat, Droplet, Leaf, Utensils } from 'lucide-react'
 import { JournalEntry, Macros } from '@/lib/types'
 import { formatTime } from '@/lib/utils'
 import { useEntries } from '@/lib/entries-context'
@@ -69,33 +68,31 @@ export default function FoodPage() {
     <div className="flex flex-col min-h-screen pb-28">
       {/* Header */}
       <div className="px-5 pt-8 pb-4 flex items-center gap-3">
-        <Link href="/" className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-600" />
-        </Link>
+        <LogoMark />
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Food Log</h1>
-          <p className="text-xs text-gray-400">{formattedDate}</p>
+          <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+          <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
         </div>
+      </div>
+      <div className="px-5 pb-3">
+        <h1 className="text-2xl font-bold text-gray-900">Food Log</h1>
+        <p className="text-xs text-gray-400 mt-0.5">{formattedDate}</p>
       </div>
 
       <div className="flex flex-col gap-4 px-5">
         {/* Daily totals card */}
-        <div className="rounded-2xl border border-gray-100 bg-white px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Flame size={15} className="text-orange-500" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Today's Totals</span>
-            </div>
-            <span className="text-2xl font-bold text-gray-900 tabular-nums">
-              {totalCalories > 0 ? `${totalCalories}` : '—'}
-              {totalCalories > 0 && <span className="text-sm font-normal text-gray-400 ml-1">kcal</span>}
+        <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3.5 flex flex-col gap-3">
+          <div className="flex items-baseline justify-end gap-1.5">
+            <span className="text-base font-semibold text-gray-700 tabular-nums leading-none">
+              {totalCalories > 0 ? totalCalories : '—'}
             </span>
+            <span className="text-xs text-gray-400">kcal</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <MacroTile label="Protein" value={totalProtein} unit="g" color="bg-blue-50" textColor="text-blue-700" />
-            <MacroTile label="Carbs"   value={totalCarbs}   unit="g" color="bg-amber-50" textColor="text-amber-700" />
-            <MacroTile label="Fat"     value={totalFat}     unit="g" color="bg-orange-50" textColor="text-orange-700" />
-            <MacroTile label="Fibre"   value={totalFibre}   unit="g" color="bg-green-50" textColor="text-green-700" />
+          <div className="grid grid-cols-4">
+            <MacroStat label="Proteins" value={totalProtein} iconBg="bg-blue-50"   icon={<Dumbbell size={16} className="text-blue-500"   />} />
+            <MacroStat label="Carbs"    value={totalCarbs}   iconBg="bg-amber-50"  icon={<Wheat    size={16} className="text-amber-500"  />} />
+            <MacroStat label="Fats"     value={totalFat}     iconBg="bg-orange-50" icon={<Droplet  size={16} className="text-orange-500" />} />
+            <MacroStat label="Fiber"    value={totalFibre}   iconBg="bg-green-50"  icon={<Leaf     size={16} className="text-green-500"  />} />
           </div>
         </div>
 
@@ -351,13 +348,25 @@ function EditSheet({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function MacroTile({ label, value, unit, color, textColor }: { label: string; value: number; unit: string; color: string; textColor: string }) {
+function MacroStat({ label, value, icon, iconBg }: { label: string; value: number; icon: React.ReactNode; iconBg: string }) {
+  const display = value > 0 ? (value % 1 === 0 ? value : parseFloat(value.toFixed(1))) : '—'
   return (
-    <div className={`rounded-xl ${color} px-3 py-2.5 flex items-center justify-between`}>
-      <p className="text-xs text-gray-500 font-medium">{label}</p>
-      <p className={`text-sm font-bold ${textColor} tabular-nums`}>
-        {value > 0 ? value.toFixed(0) : '—'}<span className="text-[10px] font-normal ml-0.5">{unit}</span>
-      </p>
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${iconBg}`}>
+        {icon}
+      </div>
+      <span className="text-sm font-bold text-gray-900 tabular-nums">{display}{value > 0 ? ' g' : ''}</span>
+      <span className="text-[10px] text-gray-500">{label}</span>
+    </div>
+  )
+}
+
+function LogoMark() {
+  return (
+    <div className="w-11 h-11 bg-gray-900 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </div>
   )
 }
