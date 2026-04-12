@@ -26,7 +26,7 @@ cd project-trace
 npm install
 ```
 
-### 3. Install Python dependencies (Garmin sync)
+### 3. Install Python dependencies
 
 ```bash
 pip install -r scripts/requirements.txt
@@ -40,8 +40,6 @@ Copy the example file and fill in your values:
 cp .env.local.example .env.local
 ```
 
-Open `.env.local` and fill in:
-
 | Variable | Where to get it |
 |---|---|
 | `DATABASE_URL` | [console.neon.tech](https://console.neon.tech) → your project → Connection Details |
@@ -50,53 +48,76 @@ Open `.env.local` and fill in:
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `ELEVENLABS_API_KEY` | [elevenlabs.io](https://elevenlabs.io) → Profile → API Key |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | [console.twilio.com](https://console.twilio.com) → Account Info |
-| `DEMO_PHONE_NUMBER` | Your WhatsApp number with country code (e.g. `+14155550123`) |
+| `TWILIO_WHATSAPP_TO` | Your WhatsApp number with country code (e.g. `+14155550123`) |
+| `ARA_API_KEY` | [app.ara.so](https://app.ara.so) → Settings → System → API Key |
 
-### 5. Sync Garmin data
-
-Run once to pull your health data into the DB:
-
-```bash
-python scripts/garmin_sync.py --days 14
-```
-
-On first run you may be prompted for an MFA code if your Garmin account has 2FA enabled. After that, tokens are cached at `~/.garminconnect` and reused automatically.
-
-### 6. Run the app
+### 5. Run the app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The app hot-reloads as you make changes.
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
 ## Data sync
 
-The Garmin sync script is a one-shot pull — run it whenever you want fresh data:
+Garmin sync runs automatically every time you start the app (`npm run dev` or `npm start`). It connects to Garmin Connect, writes today's snapshot and recent workouts to Neon, then triggers Claude insight regeneration.
+
+HRV and sleep are computed by Garmin overnight — start the app in the morning to get last night's values.
+
+To backfill more history manually:
 
 ```bash
-python scripts/garmin_sync.py           # today's snapshot + last 14 days of workouts
-python scripts/garmin_sync.py --days 30 # backfill more workout history
+python scripts/garmin_sync.py --days 30
 ```
 
-HRV and sleep data are computed by Garmin overnight, so run the sync in the morning to get last night's values.
+---
+
+## WhatsApp agent (Ara)
+
+Project Trace has two WhatsApp integrations:
+
+### 1. Bidirectional health assistant (`scripts/ara_agent.py`)
+
+A conversational agent you can text to ask health questions or log entries:
+- "How did I sleep last night?" → pulls real data from the DB
+- "Log iron supplement 400mg" → writes to `journal_entries`
+- "What are my active warnings?" → surfaces the latest Claude insights
+
+This is deployed to Ara's cloud **once** by the project owner — everyone else just texts it:
+
+```bash
+ara deploy scripts/ara_agent.py
+```
+
+### 2. Daily summary push (`ara/main.py`)
+
+A scheduled agent that runs automatically every night at 9 PM ET. It fetches today's data, generates a Claude summary, and sends it to your WhatsApp via Twilio. No action needed — it runs on Ara's servers once deployed:
+
+```bash
+ara deploy ara/main.py
+```
+
+> Both `ara deploy` commands are **one-time deploys** — not something anyone cloning the repo needs to run. Only re-deploy if you change the agent code.
 
 ---
 
 ## Project structure
 
 ```
-app/           Next.js app (pages, API routes)
-components/    React components
-lib/           Shared types, DB client, utilities
-scripts/       Python scripts (run separately from the Next.js app)
-  garmin_sync.py       pulls Garmin data → Neon DB
-  requirements.txt     Python dependencies
-public/        Static assets
+app/             Next.js app (pages, API routes)
+components/      React components
+lib/             Shared types, DB client, utilities
+scripts/
+  garmin_sync.py     pulls Garmin data → Neon DB, triggers insight generation
+  ara_agent.py       bidirectional WhatsApp health agent (deploy to Ara once)
+  requirements.txt   Python deps for both scripts
+ara/
+  main.py            scheduled daily summary agent (9 PM ET push via WhatsApp)
 ```
 
 Key docs:
 - `REQUIREMENTS.md` — full feature spec, data model, demo script
-- `GARMIN_SYNC.md` — Garmin integration details and troubleshooting
+- `DB_SCHEMA.md` — database schema reference
