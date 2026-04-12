@@ -36,7 +36,7 @@ One voice tap logs everything. The app triangulates your journal with tracker da
 | Database | Neon (Postgres, serverless) | Free tier, Claude Code MCP integration |
 | AI/LLM | Claude claude-sonnet-4-6 | Insight generation, log parsing, pattern inference |
 | STT | ElevenLabs (Scribe v1) | Speech-to-text for voice log input |
-| Tracker Input | Terra API (hackathon tier) | Bridges fitness trackers (e.g. Apple Health) without native app |
+| Tracker Input | `garminconnect` (Python lib) | Pulls data directly from Garmin Connect using your credentials — no developer key needed |
 | Notifications | Twilio for WhatsApp | Sandbox works without Meta verification |
 | Auth | None (single-user demo) | Eliminates 30+ min of build time |
 
@@ -184,10 +184,11 @@ Timestamps are first-class data. The time a supplement was taken relative to foo
 
 **Sync frequency:** Every 48 hours (Terra webhook or manual pull)
 
-**Terra integration flow:**
-- User completes Terra OAuth on first setup (iOS Health app authorization)
-- Terra sends webhook to `/api/terra/webhook` with data payload
-- Daily summary data stored in `tracker_snapshots`; individual workouts stored in `workouts` table
+**Garmin integration flow:**
+- `scripts/garmin_sync.py` authenticates with Garmin Connect using your email/password (via the `garminconnect` Python library — no developer API key required)
+- Script pulls today's HRV, sleep, daily stats, and recent workouts, then upserts them into `tracker_snapshots` and `workouts`
+- Run the script once before the demo (or on a schedule) — the Next.js app reads from DB as normal
+- See `GARMIN_SYNC.md` for full setup and usage
 
 **Anomaly highlighting:** If today's value deviates >10% from 14-day average, tile background turns amber. Tooltip explains the deviation.
 
@@ -361,7 +362,7 @@ These tasks are all setup, config, SQL, and scripting. Do them while Wave 1 is r
 - Run seed script and verify data looks correct in Neon console
 
 **External Services Setup**
-- **Terra API:** Register for hackathon tier, complete OAuth app setup, note the webhook URL format (`/api/terra/webhook`), test with a sample payload
+- **Garmin Connect:** Confirm your Garmin Connect email + password work. Run `scripts/garmin_sync.py` once to verify tokens are created and data is returned. See `GARMIN_SYNC.md`.
 - **Twilio:** Create account, enable WhatsApp sandbox, send a test message to confirm sandbox works. Save `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` to `.env.local`
 - **ElevenLabs:** Create account, generate API key (Scribe v1 access), save to `.env.local`
 - **Next.js scaffold:** Run `npx create-next-app@latest project-trace --typescript --tailwind --app`, confirm it boots
@@ -412,7 +413,7 @@ Complete these **before** the 3-hour clock starts:
 
 - [ ] Neon project created, connection string saved
 - [ ] Twilio account created, WhatsApp sandbox enabled, test message sent
-- [ ] Terra API hackathon tier approved, API key ready
+- [ ] Garmin Connect credentials confirmed (email + password for the account linked to your watch)
 - [ ] ElevenLabs account created, API key ready (Scribe v1 STT)
 - [ ] Anthropic API key ready
 - [ ] Next.js repo scaffolded (`npx create-next-app@latest project-trace`)

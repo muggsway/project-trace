@@ -145,7 +145,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   async function regenerate() {
     if (!generatedWorkout) return
     setGeneratedWorkout(null)
-    setSaved(false)
+    setScheduled(null)
     await sendMessage('Regenerate a different version of that workout please.')
   }
 

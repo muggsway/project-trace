@@ -41,6 +41,12 @@ export interface TrackerSnapshot {
   steps: number
   steps_avg_14d: number
   deep_sleep_pct?: number
+  deep_sleep_secs?: number
+  light_sleep_secs?: number
+  rem_sleep_secs?: number
+  body_battery_high?: number
+  body_battery_low?: number
+  avg_stress?: number
 }
 
 export interface Workout {
