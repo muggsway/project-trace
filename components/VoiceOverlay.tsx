@@ -79,7 +79,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
       {/* Close */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
       >
         <X size={20} />
       </button>
@@ -175,7 +175,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
           )}
         </div>
 
-        <p className="text-white/30 text-xs text-center">
+        <p className="text-white/30 text-xs text-center pb-[env(safe-area-inset-bottom)]">
           Powered by ElevenLabs · entries parsed by Claude
         </p>
       </div>

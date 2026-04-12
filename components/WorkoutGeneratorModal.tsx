@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Mic, Square, Send, RefreshCw, CheckCircle, Dumbbell } from 'lucide-react'
+import { X, Mic, Square, Send, RefreshCw, CheckCircle, Dumbbell, Volume2, VolumeX } from 'lucide-react'
 import { dummyTrackerSnapshot, dummyWorkout } from '@/lib/dummy-data'
 
 interface Message {
@@ -47,13 +47,53 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null)
   const [saved, setSaved] = useState(false)
   const [markedDone, setMarkedDone] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const mutedRef = useRef(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
+
+  // Stop audio when modal unmounts
+  useEffect(() => {
+    return () => { audioRef.current?.pause() }
+  }, [])
+
+  // Speak the opening question on first mount
+  useEffect(() => {
+    const parsed = parseAssistantContent(OPENING_MESSAGE.content)
+    speakText(parsed.message)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function speakText(text: string) {
+    if (mutedRef.current || !text) return
+    try {
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) return
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.play()
+      audio.onended = () => URL.revokeObjectURL(url)
+    } catch {
+      // silently fail — user can still read the text
+    }
+  }
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
@@ -89,10 +129,14 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
 
       if (data.type === 'workout' && data.workout) {
         setGeneratedWorkout(data.workout)
+        speakText(data.message || 'Here is your workout.')
+      } else if (data.message) {
+        speakText(data.message)
       }
     } catch {
       const errMsg: Message = { role: 'assistant', content: JSON.stringify({ type: 'question', message: 'Something went wrong. Please try again.' }) }
       setMessages([...updated, errMsg])
+      speakText('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -167,9 +211,26 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
           <h2 className="font-bold text-gray-900 text-base leading-tight">Workout Generator</h2>
           <p className="text-xs text-gray-400">Powered by Claude</p>
         </div>
-        <button onClick={onClose} className="ml-auto p-2 rounded-xl hover:bg-gray-100 transition-colors">
-          <X size={20} className="text-gray-500" />
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => {
+              const next = !mutedRef.current
+              mutedRef.current = next
+              setMuted(next)
+              if (next) { audioRef.current?.pause(); audioRef.current = null }
+            }}
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            title={muted ? 'Unmute' : 'Mute voice'}
+          >
+            {muted
+              ? <VolumeX size={18} className="text-gray-400" />
+              : <Volume2 size={18} className="text-gray-500" />
+            }
+          </button>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
       </div>
 
       {/* Health context pill */}
@@ -255,7 +316,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
       )}
 
       {/* Input bar */}
-      <div className="px-5 pb-8 pt-2 border-t border-gray-100 flex items-center gap-2">
+      <div className="px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-2 border-t border-gray-100 flex items-center gap-2">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}

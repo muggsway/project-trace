@@ -10,11 +10,39 @@
   --amber-border: #fcd34d;
 }
 
+/* Prevent iOS text size adjustment and tap highlight */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* Respect safe areas (notch / home bar) */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Prevent elastic scroll bounce on iOS from revealing background */
+  overscroll-behavior: none;
+}
+
+/* Smooth scrolling inside scroll containers */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Minimum 44px touch targets on all interactive elements */
+button, a, input, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Allow smaller visual size while keeping touch target — padding trick */
+button.compact, a.compact {
+  min-height: unset;
+  min-width: unset;
+  padding: 10px;
 }
 
 @keyframes pulse-ring {

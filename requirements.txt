@@ -1,0 +1,26 @@
+# Project Trace — Node.js / npm dependencies
+# Update this file whenever a new package is installed (npm install <pkg>)
+# Full versions are locked in package-lock.json; these are the declared ranges.
+
+# --- Runtime ---
+next==16.2.3
+react==19.2.4
+react-dom==19.2.4
+@anthropic-ai/sdk==0.88.0        # Claude API — workout generator, insight engine, log parsing
+@neondatabase/serverless==1.0.2  # Neon Postgres serverless client
+lucide-react==1.8.0              # Icon library
+
+# --- Dev / Build ---
+typescript==5
+tailwindcss==4
+@tailwindcss/postcss==4
+@types/node==20
+@types/react==19
+@types/react-dom==19
+eslint==9
+eslint-config-next==16.2.3
+
+# --- External APIs (no npm package — configured via .env.local) ---
+# ElevenLabs  Speech-to-Text (Scribe v1)  — ELEVENLABS_API_KEY
+# Terra API   Fitness tracker sync        — TERRA_API_KEY, TERRA_DEV_ID
+# Twilio      WhatsApp notifications      — TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN

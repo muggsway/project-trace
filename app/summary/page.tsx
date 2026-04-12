@@ -40,7 +40,7 @@ export default function SummaryPage() {
   })
 
   return (
-    <div className="flex flex-col min-h-screen pb-10">
+    <div className="flex flex-col min-h-dvh pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="px-5 pt-8 pb-4 flex items-center gap-3">
         <Link

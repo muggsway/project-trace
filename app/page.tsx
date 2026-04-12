@@ -28,7 +28,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="flex flex-col min-h-screen pb-28">
+      <div className="flex flex-col min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {/* Header */}
         <div className="px-5 pt-8 pb-4 flex items-start justify-between">
           <div>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Floating action buttons */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
+      <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
         {/* Action menu options — shown above when open */}
         {showActionMenu && (
           <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
