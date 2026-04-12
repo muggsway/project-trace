@@ -11,7 +11,7 @@ import LogTimeline from '@/components/LogTimeline'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import WorkoutGeneratorModal from '@/components/WorkoutGeneratorModal'
 import FoodTrackerTile from '@/components/FoodTrackerTile'
-import { dummyTrackerSnapshot, dummyWorkout, dummyEntries, dummyInsights } from '@/lib/dummy-data'
+import { dummyTrackerSnapshot, dummyWorkout, dummyEntries } from '@/lib/dummy-data'
 import { TrackerSnapshot, Workout } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 
@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [snap, setSnap] = useState<TrackerSnapshot>(dummyTrackerSnapshot)
   const [workout, setWorkout] = useState<Workout | null>(dummyWorkout)
   const [healthLoading, setHealthLoading] = useState(true)
+  const [notices, setNotices] = useState<string[]>([])
   const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([])
 
   const fetchPlanned = useCallback(async () => {
@@ -56,6 +57,16 @@ export default function DashboardPage() {
       .finally(() => setHealthLoading(false))
   }, [])
 
+  // Load cached notices — read only, never triggers Claude
+  useEffect(() => {
+    fetch('/api/insights/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.cached?.warnings?.length) setNotices(data.cached.warnings)
+      })
+      .catch(() => {})
+  }, [])
+
   function handleVoiceResult(transcript: string) {
     setLastTranscript(transcript)
     // TODO (Voice & Parsing — Person A): POST transcript to /api/log/parse,
@@ -76,7 +87,7 @@ export default function DashboardPage() {
             </h1>
           </div>
           <Link
-            href="/analyse"
+            href="/analyze"
             className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors"
           >
             <BarChart2 size={13} />
@@ -85,8 +96,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col gap-4 px-5">
-          {/* Insights banner */}
-          <InsightsBanner insights={dummyInsights} />
+          {/* Notices banner — powered by cached Claude insights */}
+          <InsightsBanner notices={notices} />
 
           {/* Toast: last transcript processed */}
           {lastTranscript && (
