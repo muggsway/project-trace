@@ -4,20 +4,21 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Camera, Flame, Pencil, X, Utensils } from 'lucide-react'
 import { JournalEntry, Macros } from '@/lib/types'
-import { dummyEntries } from '@/lib/dummy-data'
 import { formatTime } from '@/lib/utils'
+import { useEntries } from '@/lib/entries-context'
 
 export default function FoodPage() {
-  const [entries, setEntries] = useState<JournalEntry[]>(dummyEntries)
-  // Map entry id → local object URL for uploaded photo thumbnails
+  const { entries: allEntries, loading, addEntries } = useEntries()
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [overrides, setOverrides] = useState<Record<string, Partial<JournalEntry>>>({})
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [editing, setEditing] = useState<JournalEntry | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const foodEntries = entries
+  const foodEntries = allEntries
     .filter((e) => e.entry_type === 'food' && e.status === 'confirmed')
+    .map((e) => ({ ...e, ...overrides[e.id] }))
     .sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())
 
   const totalCalories = foodEntries.reduce((sum, e) => sum + (e.macros?.calories ?? 0), 0)
@@ -41,7 +42,7 @@ export default function FoodPage() {
         return
       }
       const entry: JournalEntry = { ...data.entry, macros: data.macros }
-      setEntries((prev) => [entry, ...prev])
+      addEntries([entry])
       setThumbnails((prev) => ({ ...prev, [entry.id]: thumbUrl }))
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -53,7 +54,7 @@ export default function FoodPage() {
   }
 
   function handleEntryUpdated(updated: JournalEntry) {
-    setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))
+    setOverrides((prev) => ({ ...prev, [updated.id]: updated }))
     setEditing(null)
   }
 
@@ -103,9 +104,15 @@ export default function FoodPage() {
             {foodEntries.length} {foodEntries.length === 1 ? 'item' : 'items'} logged
           </h2>
 
-          {foodEntries.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col gap-2">
+              {[1,2].map(i => (
+                <div key={i} className="rounded-2xl border border-gray-100 bg-gray-50 h-16 animate-pulse" />
+              ))}
+            </div>
+          ) : foodEntries.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              No food logged yet. Take a photo to get started.
+              No food logged yet. Use Trace or take a photo.
             </div>
           ) : (
             <div className="flex flex-col gap-2">

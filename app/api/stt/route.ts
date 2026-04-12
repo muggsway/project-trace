@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!response.ok) {
     const error = await response.text()
     console.error('ElevenLabs STT error:', error)
-    return NextResponse.json({ error: 'Transcription failed', detail: error }, { status: 502 })
+    return NextResponse.json({ error: `ElevenLabs: ${error}` }, { status: 502 })
   }
 
   const result = await response.json()

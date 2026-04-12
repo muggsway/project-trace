@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { EntriesProvider } from '@/lib/entries-context'
 
 export const metadata: Metadata = {
   title: 'Project Trace',
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh bg-[#f8f9fa] antialiased">
         {/* min-h-dvh uses dynamic viewport height — fixes iOS Safari address bar issue */}
         <div className="max-w-md mx-auto min-h-dvh bg-white shadow-sm relative">
-          {children}
+          <EntriesProvider>
+            {children}
+          </EntriesProvider>
         </div>
       </body>
     </html>
