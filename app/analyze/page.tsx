@@ -69,15 +69,16 @@ export default function AnalyzePage() {
     if (!insights) return
     setSending(true)
     try {
-      const summary = {
-        what_worked: insights.what_worked ?? '',
-        what_was_average: insights.what_was_average ?? '',
-        warnings: insights.warnings ?? [],
-      }
       const res = await fetch('/api/notify/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary }),
+        body: JSON.stringify({
+          summary: {
+            what_worked: insights.what_worked ?? '',
+            what_was_average: insights.what_was_average ?? '',
+            warnings: insights.warnings ?? [],
+          },
+        }),
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Unknown error' }))
@@ -121,7 +122,7 @@ export default function AnalyzePage() {
   const legacyNotices = (!raw && legacy?.warnings?.length) ? legacy.warnings : []
 
   return (
-    <div className="flex flex-col min-h-screen pb-16">
+    <div className="flex flex-col min-h-screen pb-[calc(8rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="px-5 pt-8 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -275,28 +276,30 @@ export default function AnalyzePage() {
             </div>
           )}
 
-          {/* ── WHATSAPP SEND ── */}
-          {legacy && (
-            <div className="mt-2 pb-2">
-              {sent ? (
-                <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-50 border border-green-200">
-                  <CheckCircle size={16} className="text-green-600" />
-                  <span className="text-sm font-semibold text-green-700">Sent via WhatsApp</span>
-                </div>
-              ) : (
-                <button
-                  onClick={sendWhatsApp}
-                  disabled={sending}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  <Send size={15} />
-                  {sending ? 'Sending…' : 'Send via WhatsApp'}
-                </button>
-              )}
-              <p className="text-center text-xs text-gray-400 mt-2">Delivered via Twilio · auto-sent at 9 PM</p>
-            </div>
-          )}
 
+        </div>
+      )}
+
+      {/* ── WhatsApp sticky button ── */}
+      {legacy && (
+        <div className="fixed bottom-[calc(2rem+env(safe-area-inset-bottom))] left-0 right-0 z-40">
+          <div className="max-w-md mx-auto px-5">
+            {sent ? (
+              <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-50 border border-green-200 shadow-2xl">
+                <CheckCircle size={16} className="text-green-600" />
+                <span className="text-sm font-semibold text-green-700">Sent via WhatsApp</span>
+              </div>
+            ) : (
+              <button
+                onClick={sendWhatsApp}
+                disabled={sending}
+                className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 active:scale-[0.98] text-white py-4 shadow-2xl transition-all disabled:opacity-50"
+              >
+                <Send size={18} />
+                <span className="text-sm font-semibold tracking-wide">{sending ? 'Sending…' : 'Send via WhatsApp'}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
