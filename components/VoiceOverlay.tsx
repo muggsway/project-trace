@@ -23,6 +23,7 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
   const [error, setError] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const mimeTypeRef = useRef<string>('audio/webm')
 
   async function speakText(text: string) {
     setStage('speaking')
@@ -63,15 +64,21 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
     setError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+
+      // Pick the best supported MIME type for this browser/OS
+      const preferred = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+      const mimeType = preferred.find(t => MediaRecorder.isTypeSupported(t)) ?? ''
+      mimeTypeRef.current = mimeType || 'audio/webm'
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       chunksRef.current = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
         setStage('thinking')
-        await transcribeAndParse(new Blob(chunksRef.current, { type: 'audio/webm' }))
+        await transcribeAndParse(new Blob(chunksRef.current, { type: mimeTypeRef.current }))
       }
-      recorder.start()
+      recorder.start(250) // collect chunks every 250ms — prevents corrupted webm headers
       mediaRecorderRef.current = recorder
       setStage('recording')
     } catch {
@@ -85,8 +92,9 @@ export default function VoiceOverlay({ onClose, onResult }: VoiceOverlayProps) {
 
   async function transcribeAndParse(blob: Blob) {
     try {
+      const ext = mimeTypeRef.current.includes('mp4') ? 'm4a' : mimeTypeRef.current.includes('ogg') ? 'ogg' : 'webm'
       const form = new FormData()
-      form.append('audio', blob, 'recording.webm')
+      form.append('audio', blob, `recording.${ext}`)
       const sttRes = await fetch('/api/stt', { method: 'POST', body: form })
       if (!sttRes.ok) {
         const { error } = await sttRes.json().catch(() => ({ error: 'Unknown' }))

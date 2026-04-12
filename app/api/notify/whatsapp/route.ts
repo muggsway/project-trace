@@ -28,19 +28,22 @@ export async function POST(req: NextRequest) {
     weekday: 'long', month: 'long', day: 'numeric',
   })
 
+  // Twilio WhatsApp limit is 1600 chars — truncate long fields to fit
+  const trunc = (s: string, max: number) => s.length > max ? s.slice(0, max - 1) + '…' : s
+
   const lines: string[] = [
     `📊 *Project Trace — ${dateLabel}*`,
     '',
     '✅ *What worked well*',
-    summary.what_worked,
+    trunc(summary.what_worked, 300),
     '',
     '📈 *What was average*',
-    summary.what_was_average,
+    trunc(summary.what_was_average, 300),
   ]
 
   if (summary.warnings?.length > 0) {
     lines.push('', '⚠️ *Watch out*')
-    for (const w of summary.warnings) lines.push(`• ${w}`)
+    for (const w of summary.warnings) lines.push(`• ${trunc(w, 200)}`)
   }
 
   lines.push('', '_Powered by Project Trace_')

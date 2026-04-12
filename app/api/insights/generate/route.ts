@@ -63,7 +63,7 @@ export async function POST() {
 
     const journalText = (journalEntries as { entry_type: string; description: string; quantity?: string; logged_at: string }[])
       .map(e => {
-        const time = new Date(e.logged_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        const time = new Date(e.logged_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         return `${time} [${e.entry_type}] ${e.description}${e.quantity ? ` (${e.quantity})` : ''}`
       }).join('\n')
 

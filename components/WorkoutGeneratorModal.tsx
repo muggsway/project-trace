@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Mic, Square, Send, RefreshCw, CheckCircle, Dumbbell, Volume2, VolumeX, CalendarDays, CalendarClock } from 'lucide-react'
+import { X, Mic, Square, Send, RefreshCw, CheckCircle, Volume2, VolumeX, CalendarDays, CalendarClock } from 'lucide-react'
 import { dummyTrackerSnapshot, dummyWorkout } from '@/lib/dummy-data'
 
 interface Message {
@@ -52,15 +52,23 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   const chunksRef = useRef<Blob[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const ttsAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  // Stop audio when modal unmounts
+  // Push history state so browser back closes the modal
   useEffect(() => {
-    return () => { audioRef.current?.pause() }
-  }, [])
+    history.pushState({ workoutGenerator: true }, '')
+    const handlePop = () => onClose()
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      ttsAbortRef.current?.abort()
+      audioRef.current?.pause()
+    }
+  }, [onClose])
 
   // Speak the opening question on first mount
   useEffect(() => {
@@ -71,26 +79,29 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
 
   async function speakText(text: string) {
     if (mutedRef.current || !text) return
+    // Cancel any in-flight TTS request and stop current audio
+    ttsAbortRef.current?.abort()
+    ttsAbortRef.current = new AbortController()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
     try {
-      // Stop any currently playing audio
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: ttsAbortRef.current.signal,
       })
       if (!res.ok) return
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
-      audio.playbackRate = 1.15   // additional speed-up on top of ElevenLabs speed param
       audioRef.current = audio
       audio.play()
       audio.onended = () => URL.revokeObjectURL(url)
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return
       // silently fail — user can still read the text
     }
   }
@@ -166,15 +177,18 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      const preferred = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+      const mimeType = preferred.find(t => MediaRecorder.isTypeSupported(t)) ?? ''
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       chunksRef.current = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
         setRecordingState('processing')
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm'
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' })
         const form = new FormData()
-        form.append('audio', blob, 'recording.webm')
+        form.append('audio', blob, `recording.${ext}`)
         try {
           const res = await fetch('/api/stt', { method: 'POST', body: form })
           const { transcript } = await res.json()
@@ -185,7 +199,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
           setRecordingState('idle')
         }
       }
-      recorder.start()
+      recorder.start(250)
       mediaRecorderRef.current = recorder
       setRecordingState('recording')
     } catch {
@@ -202,12 +216,18 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
     <div className="w-full max-w-md flex flex-col bg-white h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-8 pb-4 border-b border-gray-100">
-        <div className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center">
-          <Dumbbell size={16} className="text-white" />
+        <div className="w-11 h-11 bg-gray-900 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+            <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
         <div>
-          <h2 className="font-bold text-gray-900 text-base leading-tight">Workout Generator</h2>
-          <p className="text-xs text-gray-400">Powered by Claude</p>
+          <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
+          <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
+        </div>
+        <div className="ml-auto flex items-end flex-col">
+          <p className="text-base font-bold text-gray-900 leading-none">Workout</p>
+          <p className="text-[10px] text-gray-400 leading-none mt-0.5">Generator</p>
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button

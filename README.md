@@ -1,6 +1,96 @@
-# Project Trace
+# Trace — AI Health Companion
 
-A health-tracking app that correlates wearable data (Garmin), voice-logged meals/supplements, and AI-generated insights — built for the Anthropic Hackathon, Biology & Healthcare track.
+Trace is a personal health-tracking app that connects wearable data, voice-logged nutrition and mood, and AI-generated insights into a single mobile interface. Built for the Anthropic Hackathon — Biology & Healthcare track.
+
+---
+
+## What it does
+
+**Home screen**
+- Pulls today's Garmin data (HRV, sleep, resting HR, steps, body battery, stress) and compares against your 14-day averages
+- Tracks nutrition — log meals by voice, see daily calories, protein, carbs, fat, and fibre
+- Shows supplements logged today, hydration progress, workout summary, and mood
+- Surfaces active warnings from your latest AI analysis (e.g. supplement timing conflicts)
+- Today's Log — a chronological timeline of everything you've tracked
+
+**Voice logging**
+- Tap the mic, speak naturally: "I had oatmeal with banana and two eggs, and took my iron supplement"
+- Claude extracts structured entries (food with macros, supplements, mood, workouts, water)
+- If details are missing, Trace asks a follow-up question via ElevenLabs TTS and waits for your answer
+- Multi-turn conversation until all data is captured, then saves to DB
+
+**Food log**
+- Photo logging — take a photo of your meal, Claude Vision estimates macros
+- Voice logging via the main voice button
+- Daily macro totals with breakdown by protein, carbs, fat, and fibre
+
+**Analyze**
+- AI-generated insights from your last 14 days of Garmin data + today's journal
+- Three sections: What Worked Well · What Was Average · Watch Out
+- Evidence-backed, cross-domain connections (e.g. sleep ↔ HRV, supplement timing ↔ absorption)
+- Regenerate on demand
+- Send summary to WhatsApp
+
+**Workout generator**
+- Describe what you want ("30 min upper body, moderate intensity")
+- Claude generates a structured workout plan
+- Supports strength training and running
+
+---
+
+## Tech stack
+
+| Layer | Tech |
+|---|---|
+| Frontend + Backend | Next.js 15 (App Router, TypeScript) |
+| Database | Neon — serverless Postgres |
+| AI | Anthropic Claude (`claude-sonnet-4-6`) |
+| Speech-to-text | ElevenLabs Scribe v1 |
+| Text-to-speech | ElevenLabs (`eleven_flash_v2_5`) |
+| Wearable data | Garmin Connect via `garminconnect` Python library |
+| Notifications | Twilio WhatsApp |
+| Styling | Tailwind CSS v4 |
+
+---
+
+## Architecture
+
+```
+Browser (mobile-width UI)
+  │
+  ├── Voice input  →  /api/stt        (ElevenLabs Scribe)
+  │                →  /api/log/parse  (Claude — multi-turn, extracts entries + macros)
+  │                →  journal_entries (Neon DB)
+  │
+  ├── Photo input  →  /api/log/photo  (Claude Vision — food detection + macro estimation)
+  │
+  ├── Home screen  →  /api/health     (Garmin snapshot + 14-day averages)
+  │                →  /api/log/today  (today's journal entries)
+  │                →  /api/warnings   (friction items from latest insights_cache)
+  │
+  ├── Analyze      →  /api/insights/generate  (Claude — 14-day analysis → insights_cache)
+  │                →  /api/insights/status    (reads cached insights)
+  │                →  /api/notify/whatsapp    (Twilio — sends summary)
+  │
+  └── Workout gen  →  /api/workout/generate   (Claude — structured plan)
+
+scripts/garmin_sync.py  (runs separately, pulls Garmin → Neon)
+ara/main.py             (cron agent — scheduled 9 PM ET WhatsApp digest)
+```
+
+---
+
+## Database schema
+
+| Table | Purpose |
+|---|---|
+| `journal_entries` | Voice/photo-logged food, supplements, mood, workouts, water |
+| `tracker_snapshots` | Daily Garmin metrics (HRV, sleep, HR, steps, stress, body battery) |
+| `workouts` | Garmin workout history (type, duration, HR, distance) |
+| `planned_workouts` | Claude-generated workout plans |
+| `insights_cache` | Latest AI analysis — what worked, patterns, friction, raw JSON |
+| `habits` | Recurring supplement/habit tracking |
+| `health_summaries` | Daily aggregated summaries |
 
 ---
 
@@ -10,31 +100,19 @@ A health-tracking app that correlates wearable data (Garmin), voice-logged meals
 
 - Node.js 18+
 - Python 3.9+
-- A [Neon](https://neon.tech) Postgres database
-- A Garmin Connect account (the same login you use on the Garmin app)
+- Neon Postgres database
+- Garmin Connect account
 
-### 1. Clone the repo
+### 1. Clone and install
 
 ```bash
 git clone <repo-url>
 cd project-trace
-```
-
-### 2. Install Node dependencies
-
-```bash
 npm install
-```
-
-### 3. Install Python dependencies
-
-```bash
 pip install -r scripts/requirements.txt
 ```
 
-### 4. Configure environment variables
-
-Copy the example file and fill in your values:
+### 2. Environment variables
 
 ```bash
 cp .env.local.example .env.local
@@ -47,11 +125,12 @@ cp .env.local.example .env.local
 | `GARMIN_PASSWORD` | Your Garmin Connect password |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `ELEVENLABS_API_KEY` | [elevenlabs.io](https://elevenlabs.io) → Profile → API Key |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | [console.twilio.com](https://console.twilio.com) → Account Info |
+| `TWILIO_ACCOUNT_SID` | [console.twilio.com](https://console.twilio.com) → Account Info |
+| `TWILIO_AUTH_TOKEN` | [console.twilio.com](https://console.twilio.com) → Account Info |
 | `TWILIO_WHATSAPP_TO` | Your WhatsApp number with country code (e.g. `+14155550123`) |
 | `ARA_API_KEY` | [app.ara.so](https://app.ara.so) → Settings → System → API Key |
 
-### 5. Run the app
+### 3. Run
 
 ```bash
 npm run dev
@@ -63,9 +142,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Data sync
 
-Garmin sync runs automatically every time you start the app (`npm run dev` or `npm start`). It connects to Garmin Connect, writes today's snapshot and recent workouts to Neon, then triggers Claude insight regeneration.
-
-HRV and sleep are computed by Garmin overnight — start the app in the morning to get last night's values.
+Garmin sync runs automatically every time you start the app (`npm run dev` or `npm start`). HRV and sleep are computed by Garmin overnight — start the app in the morning to get last night's values.
 
 To backfill more history manually:
 
@@ -75,49 +152,36 @@ python scripts/garmin_sync.py --days 30
 
 ---
 
-## WhatsApp agent (Ara)
-
-Project Trace has two WhatsApp integrations:
-
-### 1. Bidirectional health assistant (`scripts/ara_agent.py`)
-
-A conversational agent you can text to ask health questions or log entries:
-- "How did I sleep last night?" → pulls real data from the DB
-- "Log iron supplement 400mg" → writes to `journal_entries`
-- "What are my active warnings?" → surfaces the latest Claude insights
-
-This is deployed to Ara's cloud **once** by the project owner — everyone else just texts it:
-
-```bash
-ara deploy scripts/ara_agent.py
-```
-
-### 2. Daily summary push (`ara/main.py`)
-
-A scheduled agent that runs automatically every night at 9 PM ET. It fetches today's data, generates a Claude summary, and sends it to your WhatsApp via Twilio. No action needed — it runs on Ara's servers once deployed:
-
-```bash
-ara deploy ara/main.py
-```
-
-> Both `ara deploy` commands are **one-time deploys** — not something anyone cloning the repo needs to run. Only re-deploy if you change the agent code.
-
----
-
-## Project structure
+## Key files
 
 ```
-app/             Next.js app (pages, API routes)
-components/      React components
-lib/             Shared types, DB client, utilities
+app/
+  page.tsx                      Home screen
+  food/page.tsx                 Food log
+  analyze/page.tsx              AI insights
+  api/
+    health/                     Garmin snapshot endpoint
+    log/parse/                  Claude voice parser (multi-turn)
+    log/photo/                  Claude Vision food logger
+    log/today/                  Today's journal entries
+    insights/generate/          AI insight generation
+    insights/status/            Cached insights reader
+    notify/whatsapp/            Twilio WhatsApp sender
+    whatsapp/incoming/          Twilio inbound webhook (bidirectional agent)
+    stt/                        ElevenLabs speech-to-text
+    tts/                        ElevenLabs text-to-speech
+    workout/generate/           Claude workout planner
+components/
+  VoiceOverlay.tsx              Full-screen voice recording UI
+  WorkoutGeneratorModal.tsx     Workout generation chat UI
+  LogTimeline.tsx               Today's log feed
+lib/
+  insights-prompt.ts            Claude prompt for analysis
+  entries-context.tsx           Global journal entries state
+  db.ts                         Neon DB client
 scripts/
-  garmin_sync.py     pulls Garmin data → Neon DB, triggers insight generation
-  ara_agent.py       bidirectional WhatsApp health agent (deploy to Ara once)
-  requirements.txt   Python deps for both scripts
+  garmin_sync.py                Garmin → Neon sync (runs automatically on app start)
+  ara_agent.py                  Optional Ara-based WhatsApp agent (deploy once)
 ara/
-  main.py            scheduled daily summary agent (9 PM ET push via WhatsApp)
+  main.py                       Scheduled WhatsApp digest agent (9 PM ET)
 ```
-
-Key docs:
-- `REQUIREMENTS.md` — full feature spec, data model, demo script
-- `DB_SCHEMA.md` — database schema reference
