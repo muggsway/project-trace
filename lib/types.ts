@@ -54,12 +54,18 @@ export interface Workout {
   id: string
   workout_type: string
   started_at: string
-  ended_at: string
+  ended_at?: string
   duration_mins: number
   distance_km?: number
   calories_active?: number
   avg_hr?: number
   max_hr?: number
+  // present for done planned workouts
+  source?: 'planned'
+  plan_text?: string
+  plan_json?: object
+  muscles?: string[]
+  intensity_zone?: number
 }
 
 export interface Insight {

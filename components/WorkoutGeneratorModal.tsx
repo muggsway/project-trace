@@ -2,7 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { X, Mic, Square, Send, RefreshCw, CheckCircle, Volume2, VolumeX, CalendarDays, CalendarClock } from 'lucide-react'
-import { dummyTrackerSnapshot, dummyWorkout } from '@/lib/dummy-data'
+
+interface HealthContext {
+  hrv_ms: number
+  hrv_avg_14d: number
+  sleep_hours: number
+  sleep_score?: number
+  last_workout?: { workout_type: string; duration_mins: number; avg_hr?: number; date: string } | null
+  recent_symptoms?: string[]
+}
 
 interface Message {
   role: 'user' | 'assistant'
@@ -47,6 +55,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null)
   const [scheduled, setScheduled] = useState<'today' | 'tomorrow' | null>(null)
   const [muted, setMuted] = useState(false)
+  const [healthCtx, setHealthCtx] = useState<HealthContext | null>(null)
   const mutedRef = useRef(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -69,6 +78,31 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
       audioRef.current?.pause()
     }
   }, [onClose])
+
+  // Fetch real health context on mount
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/health').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/workout/recent').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([health, recent]) => {
+      if (!health?.snapshot) return
+      const snap = health.snapshot
+      const lastWorkout = Array.isArray(recent) && recent.length > 0 ? recent[0] : null
+      setHealthCtx({
+        hrv_ms: snap.hrv_ms,
+        hrv_avg_14d: snap.hrv_avg_14d,
+        sleep_hours: snap.sleep_hours,
+        sleep_score: snap.sleep_score,
+        last_workout: lastWorkout ? {
+          workout_type: lastWorkout.workout_type,
+          duration_mins: lastWorkout.duration_mins,
+          avg_hr: lastWorkout.avg_hr,
+          date: (lastWorkout.started_at || lastWorkout.date || '').slice(0, 10),
+        } : null,
+        recent_symptoms: [],
+      })
+    })
+  }, [])
 
   // Speak the opening question on first mount
   useEffect(() => {
@@ -115,22 +149,12 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
     setLoading(true)
 
     try {
-      const snap = dummyTrackerSnapshot
       const res = await fetch('/api/workout/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: updated,
-          health_context: {
-            hrv_ms: snap.hrv_ms,
-            hrv_avg_14d: snap.hrv_avg_14d,
-            sleep_hours: snap.sleep_hours,
-            sleep_score: snap.sleep_score,
-            last_workout: dummyWorkout
-              ? { workout_type: dummyWorkout.workout_type, duration_mins: dummyWorkout.duration_mins, avg_hr: dummyWorkout.avg_hr, date: snap.date }
-              : null,
-            recent_symptoms: [],
-          },
+          health_context: healthCtx,
         }),
       })
 
@@ -164,7 +188,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
     if (!generatedWorkout) return
     const date = new Date()
     if (when === 'tomorrow') date.setDate(date.getDate() + 1)
-    const scheduled_date = date.toISOString().slice(0, 10)
+    const scheduled_date = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
     await fetch('/api/workout/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -215,7 +239,7 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
     <div className="fixed inset-0 z-50 flex justify-center">
     <div className="w-full max-w-md flex flex-col bg-white h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-8 pb-4 border-b border-gray-100">
+      <div className="flex items-center gap-3 px-5 pt-8 pb-4">
         <div className="w-11 h-11 bg-gray-900 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
             <path d="M2 12h4l2-5 4 10 3-7 2 2h5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -224,10 +248,6 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
         <div>
           <p className="text-base font-bold text-gray-900 tracking-widest uppercase leading-none">Trace</p>
           <p className="text-[10px] text-gray-400 tracking-wider uppercase leading-none mt-1">Health Companion</p>
-        </div>
-        <div className="ml-auto flex items-end flex-col">
-          <p className="text-base font-bold text-gray-900 leading-none">Workout</p>
-          <p className="text-[10px] text-gray-400 leading-none mt-0.5">Generator</p>
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -250,16 +270,32 @@ export default function WorkoutGeneratorModal({ onClose, onSaved }: WorkoutGener
           </button>
         </div>
       </div>
-
-      {/* Health context pill */}
-      <div className="px-5 py-2 flex gap-2">
-        <span className="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2 py-0.5">
-          HRV {dummyTrackerSnapshot.hrv_ms}ms ↓
-        </span>
-        <span className="text-xs bg-gray-50 border border-gray-200 text-gray-500 rounded-full px-2 py-0.5">
-          Sleep {dummyTrackerSnapshot.sleep_hours}h
-        </span>
+      <div className="px-5 pb-3">
+        <h1 className="text-2xl font-bold text-gray-900">Workout Generator</h1>
       </div>
+
+      {/* Health context pills */}
+      {healthCtx && (
+        <div className="px-5 py-2 flex gap-2 flex-wrap">
+          {(() => {
+            const delta = Math.round(((healthCtx.hrv_ms - healthCtx.hrv_avg_14d) / healthCtx.hrv_avg_14d) * 100)
+            const low = delta <= -10
+            return (
+              <span className={`text-xs rounded-full px-2 py-0.5 border ${low ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                HRV {healthCtx.hrv_ms}ms {delta > 0 ? `↑${delta}%` : `↓${Math.abs(delta)}%`}
+              </span>
+            )
+          })()}
+          <span className="text-xs bg-gray-50 border border-gray-200 text-gray-500 rounded-full px-2 py-0.5">
+            Sleep {healthCtx.sleep_hours}h{healthCtx.sleep_score ? ` · ${healthCtx.sleep_score}` : ''}
+          </span>
+          {healthCtx.last_workout && (
+            <span className="text-xs bg-gray-50 border border-gray-200 text-gray-500 rounded-full px-2 py-0.5">
+              Last: {healthCtx.last_workout.workout_type} {healthCtx.last_workout.date}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Chat thread */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-3 flex flex-col gap-3">

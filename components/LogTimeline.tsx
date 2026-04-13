@@ -22,6 +22,7 @@ export default function LogTimeline({ initialEntries }: LogTimelineProps) {
 
   const entries = initialEntries
     .filter((e) => !dismissed.has(e.id))
+    .filter((e) => !(e.entry_type === 'drink' && e.description.toLowerCase().includes('water')))
     .map((e) => ({ ...e, ...overrides[e.id] }))
 
   // Sort newest first

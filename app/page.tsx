@@ -6,7 +6,7 @@ import {
   Dumbbell, BarChart2, Droplets, Pill,
   Timer, MapPin, Heart, Flame, Moon, Activity, Footprints, Brain,
   AlertTriangle, ChevronDown, ChevronUp, Utensils, CalendarCheck, ClipboardList,
-  Wheat, Droplet, Leaf, Plus,
+  Wheat, Droplet, Leaf, Plus, X, CheckCircle,
 } from 'lucide-react'
 import VoiceOverlay from '@/components/VoiceOverlay'
 import WorkoutGeneratorModal from '@/components/WorkoutGeneratorModal'
@@ -18,6 +18,15 @@ import { useEntries } from '@/lib/entries-context'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+interface StrengthExercise { name: string; sets?: number; reps?: number | string; rest_secs?: number; tip?: string; duration?: string }
+interface RunSegment { name: string; duration_mins: number; zone?: number; description?: string }
+interface PlanJson {
+  warmup?: StrengthExercise[]
+  main?: StrengthExercise[]
+  cooldown?: StrengthExercise[]
+  segments?: RunSegment[]
+  target_hr_note?: string
+}
 interface PlannedWorkout {
   id: string
   workout_type: string
@@ -25,6 +34,7 @@ interface PlannedWorkout {
   muscles: string[] | null
   intensity_zone: number | null
   plan_text: string
+  plan_json: PlanJson | null
   scheduled_date: string
 }
 
@@ -209,14 +219,18 @@ function JournalWorkoutCard({ entry }: { entry: JournalEntry }) {
   )
 }
 
-function WorkoutMiniCard({ workout }: { workout: Workout }) {
+function WorkoutMiniCard({ workout, onClick }: { workout: Workout; onClick?: () => void }) {
   const icon = workout.workout_type?.toLowerCase().includes('run') ? '🏃' : workout.workout_type?.toLowerCase().includes('swim') ? '🏊' : workout.workout_type?.toLowerCase().includes('cycl') ? '🚴' : '💪'
   const wDate = (workout.started_at || '').slice(0, 10)
-  const today = new Date().toISOString().slice(0, 10)
+  const d = new Date(); const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   const diff = Math.round((new Date(today).getTime() - new Date(wDate).getTime()) / 86400000)
   const dateLabel = diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : `${diff}d ago`
+  const Wrapper = onClick ? 'button' : 'div'
   return (
-    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 flex flex-col gap-2">
+    <Wrapper
+      {...(onClick ? { onClick } : {})}
+      className={`w-full text-left rounded-xl bg-gray-50 border border-gray-100 px-3 py-3 flex flex-col gap-2${onClick ? ' hover:bg-gray-100 active:scale-[0.98] transition-all' : ''}`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-base">{icon}</span>
@@ -229,8 +243,9 @@ function WorkoutMiniCard({ workout }: { workout: Workout }) {
         {workout.distance_km != null && <div className="flex items-center gap-1 text-[10px] text-gray-500"><MapPin size={10} />{workout.distance_km}km</div>}
         {workout.avg_hr != null && <div className="flex items-center gap-1 text-[10px] text-gray-500"><Heart size={10} className="text-red-400" />{workout.avg_hr}bpm</div>}
         {workout.calories_active != null && <div className="flex items-center gap-1 text-[10px] text-gray-500"><Flame size={10} className="text-orange-400" />{workout.calories_active}kcal</div>}
+        {workout.muscles?.length ? <div className="flex items-center gap-1 text-[10px] text-gray-500 truncate">{workout.muscles.join(', ')}</div> : null}
       </div>
-    </div>
+    </Wrapper>
   )
 }
 
@@ -295,6 +310,8 @@ function Avatar() {
 export default function DashboardPage() {
   const [showVoice, setShowVoice] = useState(false)
   const [showWorkoutGenerator, setShowWorkoutGenerator] = useState(false)
+  const [expandedPlan, setExpandedPlan] = useState<PlannedWorkout | null>(null)
+  const [completedView, setCompletedView] = useState<Workout | null>(null)
 
   const { entries, addEntries, waterMl, addWaterMl } = useEntries()
   const [snap, setSnap] = useState<TrackerSnapshot>(dummyTrackerSnapshot)
@@ -304,8 +321,17 @@ export default function DashboardPage() {
 
   const fetchPlanned = useCallback(async () => {
     try {
-      const res = await fetch('/api/workout/planned')
+      const ld = new Date()
+      const localToday = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`
+      const res = await fetch(`/api/workout/planned?today=${localToday}`)
       if (res.ok) setPlannedWorkouts(await res.json())
+    } catch { /* non-critical */ }
+  }, [])
+
+  const fetchRecent = useCallback(async () => {
+    try {
+      const res = await fetch('/api/workout/recent')
+      if (res.ok) { const d = await res.json(); if (Array.isArray(d) && d.length) setRecentWorkouts(d) }
     } catch { /* non-critical */ }
   }, [])
 
@@ -374,7 +400,7 @@ export default function DashboardPage() {
     red:    { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-800'    },
   }
   const ms = moodMeta ? moodStyles[moodMeta.color] : null
-  const today = new Date().toISOString().slice(0, 10)
+  const _d = new Date(); const today = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`
 
   return (
     <>
@@ -504,31 +530,36 @@ export default function DashboardPage() {
               </button>
             }
           >
-            {/* Voice-logged workouts from journal */}
-            {workoutJournalEntries.map(e => <JournalWorkoutCard key={e.id} entry={e} />)}
-
-            {/* Garmin-synced workouts */}
-            {recentWorkouts.length > 0
-              ? recentWorkouts.map(w => <WorkoutMiniCard key={w.id} workout={w} />)
-              : workoutJournalEntries.length === 0 && <p className="text-xs text-gray-400 px-1">No recent workouts</p>
-            }
-
+            {/* Planned (scheduled) workouts — shown first */}
             {plannedWorkouts.map(pw => (
-              <div key={pw.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+              <button
+                key={pw.id}
+                onClick={() => setExpandedPlan(pw)}
+                className="w-full text-left rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 hover:bg-amber-100 active:scale-[0.98] transition-all"
+              >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
                     <CalendarCheck size={13} className="text-amber-600" />
                     <span className="text-xs font-semibold text-gray-800 capitalize">{pw.workout_type}</span>
                   </div>
                   <span className="text-[10px] text-amber-600 font-medium bg-amber-100 px-1.5 py-0.5 rounded-full">
-                    {pw.scheduled_date === today ? 'Today' : 'Tomorrow'}
+                    Scheduled · {pw.scheduled_date.slice(0, 10) === today ? 'Today' : 'Tomorrow'}
                   </span>
                 </div>
                 <p className="text-[10px] text-gray-500 pl-5">
                   {pw.duration_mins}min · {pw.muscles?.join(', ') ?? `Zone ${pw.intensity_zone}`}
                 </p>
-              </div>
+              </button>
             ))}
+
+            {/* Voice-logged workouts from journal */}
+            {workoutJournalEntries.map(e => <JournalWorkoutCard key={e.id} entry={e} />)}
+
+            {/* Garmin-synced workouts */}
+            {recentWorkouts.length > 0
+              ? recentWorkouts.map(w => <WorkoutMiniCard key={w.id} workout={w} onClick={w.source === 'planned' ? () => setCompletedView(w) : undefined} />)
+              : workoutJournalEntries.length === 0 && plannedWorkouts.length === 0 && <p className="text-xs text-gray-400 px-1">No recent workouts</p>
+            }
 
           </SectionCard>
 
@@ -586,6 +617,240 @@ export default function DashboardPage() {
           onSaved={() => { fetchPlanned(); setShowWorkoutGenerator(false) }}
         />
       )}
+      {completedView && (
+        <PlannedWorkoutSheet
+          plan={{
+            id: completedView.id,
+            workout_type: completedView.workout_type,
+            duration_mins: completedView.duration_mins,
+            muscles: completedView.muscles ?? null,
+            intensity_zone: completedView.intensity_zone ?? null,
+            plan_text: completedView.plan_text ?? '',
+            plan_json: (completedView.plan_json as PlanJson) ?? null,
+            scheduled_date: completedView.started_at,
+          }}
+          onClose={() => setCompletedView(null)}
+          completed
+        />
+      )}
+      {expandedPlan && (
+        <PlannedWorkoutSheet
+          plan={expandedPlan}
+          onClose={() => setExpandedPlan(null)}
+          onDone={async () => {
+            const ld = new Date()
+            const localToday = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`
+            const doneWorkout = expandedPlan
+            // Remove from planned immediately — don't re-fetch planned (race condition)
+            setPlannedWorkouts(prev => prev.filter(p => p.id !== doneWorkout.id))
+            setExpandedPlan(null)
+            await fetch('/api/workout/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: doneWorkout.id, completed_date: localToday }),
+            })
+            // Add to recent workouts list directly so it shows up immediately
+            setRecentWorkouts(prev => [{
+              id: doneWorkout.id,
+              workout_type: doneWorkout.workout_type,
+              started_at: localToday,
+              duration_mins: doneWorkout.duration_mins,
+              muscles: doneWorkout.muscles ?? undefined,
+              intensity_zone: doneWorkout.intensity_zone ?? undefined,
+              plan_text: doneWorkout.plan_text,
+              plan_json: doneWorkout.plan_json ?? undefined,
+              source: 'planned' as const,
+            }, ...prev.filter(w => w.id !== doneWorkout.id)])
+          }}
+        />
+      )}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Planned workout detail sheet
+// ---------------------------------------------------------------------------
+
+function PlannedWorkoutSheet({ plan, onClose, onDone, completed }: { plan: PlannedWorkout; onClose: () => void; onDone?: () => void; completed?: boolean }) {
+  const [marking, setMarking] = useState(false)
+
+  async function handleDone() {
+    if (!onDone) return
+    setMarking(true)
+    await onDone()
+  }
+  const pj = plan.plan_json
+  const isStrength = !pj?.segments
+  const isRun = !!pj?.segments
+
+  const zoneColors: Record<number, string> = {
+    1: 'bg-blue-50 text-blue-700 border-blue-200',
+    2: 'bg-teal-50 text-teal-700 border-teal-200',
+    3: 'bg-amber-50 text-amber-700 border-amber-200',
+    4: 'bg-orange-50 text-orange-700 border-orange-200',
+    5: 'bg-red-50 text-red-700 border-red-200',
+  }
+  const zoneLabels: Record<number, string> = { 1: 'Easy', 2: 'Light', 3: 'Moderate', 4: 'Hard', 5: 'Max' }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col" style={{ maxHeight: '82vh' }}>
+
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 shrink-0 flex items-start justify-between">
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${completed ? 'text-green-600' : 'text-gray-400'}`}>
+              {completed ? 'Completed' : plan.scheduled_date.slice(0, 10) === (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })() ? 'Today' : 'Tomorrow'}
+            </p>
+            <h2 className="text-xl font-bold text-gray-900 capitalize">{plan.workout_type}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-gray-500">{plan.duration_mins} min</span>
+              {plan.muscles?.length ? (
+                <span className="text-xs text-gray-400">· {plan.muscles.join(', ')}</span>
+              ) : plan.intensity_zone ? (
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${zoneColors[plan.intensity_zone] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  Zone {plan.intensity_zone} · {zoneLabels[plan.intensity_zone]}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 shrink-0 ml-3 mt-1"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-gray-100 mx-5 shrink-0" />
+
+        {/* Body — scrollable */}
+        <div className="overflow-y-auto px-5 py-4 flex flex-col gap-5">
+
+          {/* ── Strength plan ── */}
+          {isStrength && pj && (
+            <>
+              {pj.warmup?.length ? (
+                <Section label="Warm-Up" emoji="🌅">
+                  {pj.warmup.map((e, i) => (
+                    <ExerciseRow key={i} name={e.name} meta={e.reps ? `${e.reps} reps` : e.duration ?? ''} />
+                  ))}
+                </Section>
+              ) : null}
+
+              {pj.main?.length ? (
+                <Section label="Main Workout" emoji="💪">
+                  {pj.main.map((e, i) => (
+                    <ExerciseRow
+                      key={i}
+                      index={i + 1}
+                      name={e.name}
+                      meta={[
+                        e.sets && e.reps ? `${e.sets}×${e.reps}` : null,
+                        e.rest_secs ? `Rest ${e.rest_secs}s` : null,
+                      ].filter(Boolean).join(' · ')}
+                      tip={e.tip}
+                    />
+                  ))}
+                </Section>
+              ) : null}
+
+              {pj.cooldown?.length ? (
+                <Section label="Cool-Down" emoji="❄️">
+                  {pj.cooldown.map((e, i) => (
+                    <ExerciseRow key={i} name={e.name} meta={e.duration ?? (e.reps ? `${e.reps} reps` : '')} />
+                  ))}
+                </Section>
+              ) : null}
+            </>
+          )}
+
+          {/* ── Running plan ── */}
+          {isRun && pj?.segments && (
+            <>
+              <Section label="Segments" emoji="🏃">
+                {pj.segments.map((seg, i) => (
+                  <div key={i} className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
+                    <div className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border ${seg.zone ? (zoneColors[seg.zone] ?? 'bg-gray-50 text-gray-600 border-gray-200') : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {seg.zone ? `Z${seg.zone}` : '—'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{seg.name}</p>
+                      {seg.description && <p className="text-xs text-gray-400 mt-0.5">{seg.description}</p>}
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 tabular-nums">{seg.duration_mins}min</span>
+                  </div>
+                ))}
+              </Section>
+              {pj.target_hr_note && (
+                <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+                  <p className="text-xs text-blue-700">{pj.target_hr_note}</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Fallback — no structured JSON */}
+          {!pj && (
+            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {plan.plan_text}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+          {completed ? (
+            <div className="w-full flex items-center justify-center gap-2 rounded-2xl bg-green-50 border border-green-200 py-3.5">
+              <CheckCircle size={16} className="text-green-600" />
+              <span className="text-sm font-semibold text-green-700">Completed</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleDone}
+              disabled={marking}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gray-900 text-white py-3.5 text-sm font-semibold hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <CheckCircle size={16} />
+              {marking ? 'Saving…' : 'Mark as Done'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Section({ label, emoji, children }: { label: string; emoji: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">{emoji}</span>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+      </div>
+      <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ExerciseRow({ name, meta, tip, index }: { name: string; meta: string; tip?: string; index?: number }) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0">
+      {index !== undefined ? (
+        <span className="w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{index}</span>
+      ) : (
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0 mt-2" />
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800">{name}</p>
+        {tip && <p className="text-[11px] text-gray-400 mt-0.5 italic">{tip}</p>}
+      </div>
+      {meta && <span className="text-xs text-gray-500 shrink-0 tabular-nums font-medium">{meta}</span>}
+    </div>
   )
 }

@@ -26,7 +26,9 @@ export function EntriesProvider({ children }: { children: ReactNode }) {
 
   const fetchToday = useCallback(async () => {
     try {
-      const res = await fetch('/api/log/today')
+      const d = new Date()
+      const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const res = await fetch(`/api/log/today?date=${localDate}`)
       if (!res.ok) return
       const data: JournalEntry[] = await res.json()
       if (!Array.isArray(data)) return
